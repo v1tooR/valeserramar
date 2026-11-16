@@ -1,0 +1,11 @@
+node_modules/
+.expo/
+.env
+.env.*
+!.env.example
+.novo-app-pgpass
+/vsm-backend/media/
+*.apk
+*.aab
+*.jks
+*.keystore

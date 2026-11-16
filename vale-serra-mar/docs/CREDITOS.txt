@@ -1,0 +1,10 @@
+Assets incorporados na versão 0.2.0
+
+Logo horizontal e logo completa: arquivos de identidade visual fornecidos pelo usuário.
+Ilustração de litoral e ícone de montanhas: arquivos fornecidos pelo usuário.
+
+Fotografia do Vale do Paraíba (assets/asset-01.png), recortada do material fornecido:
+Themium · CC0 1.0 · https://creativecommons.org/publicdomain/zero/1.0/
+https://commons.wikimedia.org/wiki/File:Paisagem_Rural_do_Vale_do_Para%C3%ADba_%28Cunha-SP%29.jpg
+
+Fotografias de restaurantes, pratos e pousadas da versão anterior foram removidas do pacote. Imagens de estabelecimentos devem ser fornecidas pelos anunciantes via API.

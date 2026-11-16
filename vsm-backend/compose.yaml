@@ -1,0 +1,32 @@
+services:
+  api:
+    build: .
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?Configure DATABASE_URL}
+      DATABASE_CA_BASE64: ${DATABASE_CA_BASE64:-}
+      PUBLIC_URL: ${PUBLIC_URL:?Configure PUBLIC_URL}
+      WEB_ORIGINS: ${WEB_ORIGINS:-}
+      MEDIA_DIR: /app/media
+      HOST: 0.0.0.0
+      TRUST_PROXY: "1"
+    volumes:
+      - media:/app/media
+  proxy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [api]
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?Configure API_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+volumes:
+  media:
+  caddy_data:
+  caddy_config:
