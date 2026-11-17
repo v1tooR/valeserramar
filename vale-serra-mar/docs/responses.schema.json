@@ -1,0 +1,1163 @@
+{
+  "authSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "token": {
+        "type": "string",
+        "minLength": 1
+      },
+      "profile": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "phone": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "email",
+          "phone"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "token",
+      "profile"
+    ],
+    "additionalProperties": false
+  },
+  "businessSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "segment": {
+        "type": "string",
+        "enum": [
+          "Restaurantes",
+          "Cafeterias",
+          "Pizzarias",
+          "Bares e noite",
+          "Hospedagem",
+          "Serviços",
+          "Lazer",
+          "Comércio"
+        ]
+      },
+      "region": {
+        "type": "string"
+      },
+      "city": {
+        "type": "string"
+      },
+      "district": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "address": {
+        "type": "string"
+      },
+      "cep": {
+        "type": "string"
+      },
+      "number": {
+        "type": "string"
+      },
+      "phone": {
+        "type": "string"
+      },
+      "instagram": {
+        "type": "string"
+      },
+      "latitude": {
+        "anyOf": [
+          {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "longitude": {
+        "anyOf": [
+          {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "photo": {
+        "type": "string"
+      },
+      "logo": {
+        "type": "string"
+      },
+      "gallery": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "hours": {
+        "minItems": 7,
+        "maxItems": 7,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "day": {
+              "type": "string"
+            },
+            "open": {
+              "type": "boolean"
+            },
+            "from": {
+              "type": "string"
+            },
+            "to": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "day",
+            "open",
+            "from",
+            "to"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "acceptsReservations": {
+        "type": "boolean"
+      },
+      "amenities": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "rooms": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "price": {
+              "type": "number",
+              "minimum": 0
+            },
+            "guests": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "photo": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "description",
+            "price",
+            "guests",
+            "photo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "checkIn": {
+        "type": "string"
+      },
+      "checkOut": {
+        "type": "string"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "Rascunho",
+          "Em análise",
+          "Correções solicitadas",
+          "Aprovado",
+          "Recusado",
+          "Desativado"
+        ]
+      },
+      "correction": {
+        "type": "string"
+      },
+      "owner": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "id",
+      "name",
+      "segment",
+      "region",
+      "city",
+      "district",
+      "description",
+      "address",
+      "cep",
+      "number",
+      "phone",
+      "instagram",
+      "latitude",
+      "longitude",
+      "photo",
+      "gallery",
+      "hours",
+      "acceptsReservations",
+      "amenities",
+      "rooms",
+      "checkIn",
+      "checkOut",
+      "status",
+      "correction",
+      "owner"
+    ],
+    "additionalProperties": false
+  },
+  "catalogSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "businesses": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "segment": {
+              "type": "string",
+              "enum": [
+                "Restaurantes",
+                "Cafeterias",
+                "Pizzarias",
+                "Bares e noite",
+                "Hospedagem",
+                "Serviços",
+                "Lazer",
+                "Comércio"
+              ]
+            },
+            "region": {
+              "type": "string"
+            },
+            "city": {
+              "type": "string"
+            },
+            "district": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "address": {
+              "type": "string"
+            },
+            "cep": {
+              "type": "string"
+            },
+            "number": {
+              "type": "string"
+            },
+            "phone": {
+              "type": "string"
+            },
+            "instagram": {
+              "type": "string"
+            },
+            "latitude": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": -90,
+                  "maximum": 90
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "longitude": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": -180,
+                  "maximum": 180
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "photo": {
+              "type": "string"
+            },
+            "logo": {
+              "type": "string"
+            },
+            "gallery": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "hours": {
+              "minItems": 7,
+              "maxItems": 7,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "day": {
+                    "type": "string"
+                  },
+                  "open": {
+                    "type": "boolean"
+                  },
+                  "from": {
+                    "type": "string"
+                  },
+                  "to": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "day",
+                  "open",
+                  "from",
+                  "to"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "acceptsReservations": {
+              "type": "boolean"
+            },
+            "amenities": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "rooms": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "price": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "guests": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "photo": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "description",
+                  "price",
+                  "guests",
+                  "photo"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "checkIn": {
+              "type": "string"
+            },
+            "checkOut": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "Rascunho",
+                "Em análise",
+                "Correções solicitadas",
+                "Aprovado",
+                "Recusado",
+                "Desativado"
+              ]
+            },
+            "correction": {
+              "type": "string"
+            },
+            "owner": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "segment",
+            "region",
+            "city",
+            "district",
+            "description",
+            "address",
+            "cep",
+            "number",
+            "phone",
+            "instagram",
+            "latitude",
+            "longitude",
+            "photo",
+            "gallery",
+            "hours",
+            "acceptsReservations",
+            "amenities",
+            "rooms",
+            "checkIn",
+            "checkOut",
+            "status",
+            "correction",
+            "owner"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "products": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "businessId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "category": {
+              "type": "string"
+            },
+            "price": {
+              "type": "number",
+              "minimum": 0
+            },
+            "photo": {
+              "type": "string"
+            },
+            "available": {
+              "type": "boolean"
+            },
+            "extras": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "price": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "price"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "id",
+            "businessId",
+            "name",
+            "description",
+            "category",
+            "price",
+            "photo",
+            "available",
+            "extras"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "businesses",
+      "products"
+    ],
+    "additionalProperties": false
+  },
+  "preferencesSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "region": {
+        "type": "string"
+      },
+      "city": {
+        "type": "string"
+      },
+      "interests": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "favorites": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "recent": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "region",
+      "city",
+      "interests",
+      "favorites",
+      "recent"
+    ],
+    "additionalProperties": false
+  },
+  "productSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "businessId": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "category": {
+        "type": "string"
+      },
+      "price": {
+        "type": "number",
+        "minimum": 0
+      },
+      "photo": {
+        "type": "string"
+      },
+      "available": {
+        "type": "boolean"
+      },
+      "extras": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "price": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "price"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "id",
+      "businessId",
+      "name",
+      "description",
+      "category",
+      "price",
+      "photo",
+      "available",
+      "extras"
+    ],
+    "additionalProperties": false
+  },
+  "profileSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string"
+      },
+      "email": {
+        "type": "string",
+        "format": "email",
+        "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+      },
+      "phone": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "name",
+      "email",
+      "phone"
+    ],
+    "additionalProperties": false
+  },
+  "reservationSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "businessId": {
+        "type": "string"
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "mesa",
+          "hospedagem"
+        ]
+      },
+      "name": {
+        "type": "string"
+      },
+      "phone": {
+        "type": "string"
+      },
+      "start": {
+        "type": "string"
+      },
+      "end": {
+        "type": "string"
+      },
+      "time": {
+        "type": "string"
+      },
+      "adults": {
+        "type": "integer",
+        "exclusiveMinimum": 0,
+        "maximum": 9007199254740991
+      },
+      "children": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "roomId": {
+        "type": "string"
+      },
+      "roomName": {
+        "type": "string"
+      },
+      "notes": {
+        "type": "string"
+      },
+      "estimate": {
+        "type": "number",
+        "minimum": 0
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "Pendente",
+          "Confirmada",
+          "Recusada",
+          "Cancelada"
+        ]
+      },
+      "reply": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "businessId",
+      "kind",
+      "name",
+      "phone",
+      "start",
+      "end",
+      "time",
+      "adults",
+      "children",
+      "roomId",
+      "roomName",
+      "notes",
+      "estimate",
+      "status",
+      "reply",
+      "createdAt"
+    ],
+    "additionalProperties": false
+  },
+  "workspaceSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "businesses": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "segment": {
+              "type": "string",
+              "enum": [
+                "Restaurantes",
+                "Cafeterias",
+                "Pizzarias",
+                "Bares e noite",
+                "Hospedagem",
+                "Serviços",
+                "Lazer",
+                "Comércio"
+              ]
+            },
+            "region": {
+              "type": "string"
+            },
+            "city": {
+              "type": "string"
+            },
+            "district": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "address": {
+              "type": "string"
+            },
+            "cep": {
+              "type": "string"
+            },
+            "number": {
+              "type": "string"
+            },
+            "phone": {
+              "type": "string"
+            },
+            "instagram": {
+              "type": "string"
+            },
+            "latitude": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": -90,
+                  "maximum": 90
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "longitude": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": -180,
+                  "maximum": 180
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "photo": {
+              "type": "string"
+            },
+            "logo": {
+              "type": "string"
+            },
+            "gallery": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "hours": {
+              "minItems": 7,
+              "maxItems": 7,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "day": {
+                    "type": "string"
+                  },
+                  "open": {
+                    "type": "boolean"
+                  },
+                  "from": {
+                    "type": "string"
+                  },
+                  "to": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "day",
+                  "open",
+                  "from",
+                  "to"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "acceptsReservations": {
+              "type": "boolean"
+            },
+            "amenities": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "rooms": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "price": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "guests": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "photo": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "description",
+                  "price",
+                  "guests",
+                  "photo"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "checkIn": {
+              "type": "string"
+            },
+            "checkOut": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "Rascunho",
+                "Em análise",
+                "Correções solicitadas",
+                "Aprovado",
+                "Recusado",
+                "Desativado"
+              ]
+            },
+            "correction": {
+              "type": "string"
+            },
+            "owner": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "segment",
+            "region",
+            "city",
+            "district",
+            "description",
+            "address",
+            "cep",
+            "number",
+            "phone",
+            "instagram",
+            "latitude",
+            "longitude",
+            "photo",
+            "gallery",
+            "hours",
+            "acceptsReservations",
+            "amenities",
+            "rooms",
+            "checkIn",
+            "checkOut",
+            "status",
+            "correction",
+            "owner"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "products": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "businessId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "category": {
+              "type": "string"
+            },
+            "price": {
+              "type": "number",
+              "minimum": 0
+            },
+            "photo": {
+              "type": "string"
+            },
+            "available": {
+              "type": "boolean"
+            },
+            "extras": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "price": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "price"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "id",
+            "businessId",
+            "name",
+            "description",
+            "category",
+            "price",
+            "photo",
+            "available",
+            "extras"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "reservations": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "businessId": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "mesa",
+                "hospedagem"
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "phone": {
+              "type": "string"
+            },
+            "start": {
+              "type": "string"
+            },
+            "end": {
+              "type": "string"
+            },
+            "time": {
+              "type": "string"
+            },
+            "adults": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "children": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "roomId": {
+              "type": "string"
+            },
+            "roomName": {
+              "type": "string"
+            },
+            "notes": {
+              "type": "string"
+            },
+            "estimate": {
+              "type": "number",
+              "minimum": 0
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "Pendente",
+                "Confirmada",
+                "Recusada",
+                "Cancelada"
+              ]
+            },
+            "reply": {
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "businessId",
+            "kind",
+            "name",
+            "phone",
+            "start",
+            "end",
+            "time",
+            "adults",
+            "children",
+            "roomId",
+            "roomName",
+            "notes",
+            "estimate",
+            "status",
+            "reply",
+            "createdAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "businesses",
+      "products",
+      "reservations"
+    ],
+    "additionalProperties": false
+  }
+}
