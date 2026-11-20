@@ -84,6 +84,7 @@ async function businessBody(b: Business) {
   const { owner, status, correction, id, ...fields } = b;
   return {
     ...fields,
+    subcategory: b.subcategory ?? null,
     photo: await uploadPhoto(b.photo),
     logo: b.logo ? await uploadPhoto(b.logo) : undefined,
     gallery: await Promise.all(b.gallery.map(uploadPhoto)),
@@ -113,6 +114,13 @@ export const repository = {
       await businessBody(b),
       businessSchema,
       creating ? b.id : undefined,
+    ),
+  setTableReservations: (id: string, acceptsReservations: boolean) =>
+    send(
+      `/businesses/${encodeURIComponent(id)}/table-reservations`,
+      "PATCH",
+      { acceptsReservations },
+      businessSchema,
     ),
   submit: (id: string) =>
     send(

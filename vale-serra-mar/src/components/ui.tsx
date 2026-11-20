@@ -142,21 +142,42 @@ export function Chip({
 export function Field({
   label,
   error,
+  action,
   ...props
-}: TextInputProps & { label: string; error?: string }) {
+}: TextInputProps & {
+  label: string;
+  error?: string;
+  action?: { icon: IconName; label: string; onPress: () => void };
+}) {
+  const input = (
+    <TextInput
+      accessibilityLabel={label}
+      placeholderTextColor="#8B9890"
+      {...props}
+      style={[
+        s.field,
+        props.multiline && { minHeight: 92, textAlignVertical: "top" },
+        props.style,
+        action && u.fieldWithAction,
+      ]}
+    />
+  );
   return (
     <View style={{ gap: 4 }}>
       <Text style={s.label}>{label}</Text>
-      <TextInput
-        accessibilityLabel={label}
-        placeholderTextColor="#8B9890"
-        {...props}
-        style={[
-          s.field,
-          props.multiline && { minHeight: 92, textAlignVertical: "top" },
-          props.style,
-        ]}
-      />
+      {action ? (
+        <View>
+          {input}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={action.label}
+            onPress={action.onPress}
+            style={u.fieldAction}
+          >
+            <Icon name={action.icon} size={20} />
+          </Pressable>
+        </View>
+      ) : input}
       {error && <Text style={{ color: c.red }}>{error}</Text>}
     </View>
   );
@@ -404,7 +425,10 @@ export function Tabs({
         ["Profile", "Perfil", "user"],
       ];
   return (
-    <View style={u.tabs}>
+    <SafeAreaView
+      edges={Platform.OS === "android" ? ["bottom"] : []}
+      style={u.tabs}
+    >
       {items.map(([screen, title, icon]) => (
         <Pressable
           key={screen}
@@ -436,7 +460,7 @@ export function Tabs({
           />
         </Pressable>
       ))}
-    </View>
+    </SafeAreaView>
   );
 }
 export function Page({
@@ -471,7 +495,7 @@ export function Page({
   return (
     <SafeAreaView
       style={{ flex: 1, minHeight: 0, backgroundColor: c.white }}
-      edges={["top", "bottom"]}
+      edges={tab && Platform.OS === "android" ? ["top"] : ["top", "bottom"]}
     >
       <KeyboardAvoidingView
         style={{ flex: 1, minHeight: 0 }}
@@ -559,6 +583,17 @@ const u = StyleSheet.create({
     borderColor: c.border,
     backgroundColor: c.white,
   },
+  fieldWithAction: { paddingRight: 52 },
+  fieldAction: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+  },
   iconButton: {
     width: 40,
     height: 40,
@@ -603,7 +638,12 @@ const u = StyleSheet.create({
     borderColor: c.border,
     paddingTop: 9,
   },
-  tab: { flex: 1, minHeight: 58, alignItems: "center", gap: 4 },
+  tab: {
+    flex: 1,
+    minHeight: Platform.OS === "android" ? 50 : 58,
+    alignItems: "center",
+    gap: 4,
+  },
   footer: {
     flexShrink: 0,
     backgroundColor: c.white,

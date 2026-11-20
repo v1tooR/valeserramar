@@ -6,6 +6,7 @@ import { Text, View } from "react-native";
 import { uid, useStore } from "../store";
 import { useNav, type ScreenProps } from "../navigation";
 import { money, isRestaurant, displayDate, dateKey } from "../domain/logic";
+import { businessType } from "../domain/categories";
 import type { ReviewStatus } from "../domain/models";
 import { colors as c, styles as s } from "../theme";
 import {
@@ -18,6 +19,7 @@ import {
   Page,
   Row,
   Section,
+  Toggle,
 } from "../components/ui";
 import { Calendar } from "../components/Calendar";
 export function ReviewStatusScreen({ route }: ScreenProps) {
@@ -91,7 +93,7 @@ export function ReviewStatusScreen({ route }: ScreenProps) {
   );
 }
 export function DashboardScreen() {
-  const { state } = useStore(),
+  const { state, setTableReservations } = useStore(),
     nav = useNav();
   const b = state.businesses.find((b) => b.id === state.businessId);
   if (!b)
@@ -121,7 +123,7 @@ export function DashboardScreen() {
   return (
     <Page brand tab="Dashboard" advertiser>
       <View>
-        <Text style={s.eyebrow}>Painel do anunciante · {b.segment}</Text>
+        <Text style={s.eyebrow}>Painel do anunciante · {businessType(b).label}</Text>
         <Text style={s.title}>{b.name}</Text>
       </View>
       <View style={s.row}>
@@ -154,6 +156,20 @@ export function DashboardScreen() {
       </View>
       <Section title="Gerenciar" />
       {isRestaurant(b.segment) && (
+        <View style={s.card}>
+          <Toggle
+            title="Aceitar reservas de mesa"
+            subtitle={
+              b.acceptsReservations
+                ? "Visitantes podem solicitar uma mesa pelo app."
+                : "Reservas de mesa estão desativadas para visitantes."
+            }
+            value={b.acceptsReservations}
+            onChange={(value) => setTableReservations(b.id, value)}
+          />
+        </View>
+      )}
+      {isRestaurant(b.segment) && (
         <Row
           title="Cardápio"
           subtitle="Categorias, itens e preços"
@@ -169,7 +185,7 @@ export function DashboardScreen() {
           onPress={() => nav.navigate("ManageRooms")}
         />
       )}
-      {b.acceptsReservations && (
+      {(b.acceptsReservations || requests.length > 0) && (
         <Row
           title="Solicitações de reservas"
           subtitle={`${pending} pendentes`}

@@ -45,6 +45,10 @@ type Store = {
   updateProfile: (p: Profile) => Promise<void>;
   saveDraft: (b: Business) => void;
   saveBusiness: (b: Business) => Promise<void>;
+  setTableReservations: (
+    id: string,
+    acceptsReservations: boolean,
+  ) => Promise<void>;
   submitBusiness: (b: Business) => Promise<Business>;
   saveProduct: (p: Product) => Promise<void>;
   deleteProduct: (p: Product) => Promise<void>;
@@ -307,6 +311,23 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         update: setState,
         saveDraft,
         saveBusiness,
+        setTableReservations: async (id, acceptsReservations) => {
+          const version = revision.current;
+          const saved = await repository.setTableReservations(
+            id,
+            acceptsReservations,
+          );
+          requireCurrent(version);
+          setState((s) => ({
+            ...s,
+            businesses: s.businesses.map((b) =>
+              b.id === id
+                ? { ...b, acceptsReservations: saved.acceptsReservations }
+                : b,
+            ),
+          }));
+          await refresh();
+        },
         submitBusiness,
         saveProduct,
         authenticate: async (mode, data) => {

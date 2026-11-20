@@ -1,3 +1,5 @@
+import type { BusinessSubcategory, LodgingType } from "./categories";
+
 export type Segment =
   | "Restaurantes"
   | "Cafeterias"
@@ -51,6 +53,8 @@ export interface Business {
   id: string;
   name: string;
   segment: Segment;
+  subcategory?: BusinessSubcategory | null;
+  lodgingType?: LodgingType | null;
   region: string;
   city: string;
   district: string;

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { row, rows, transaction } from "./db.js";
 import { fail, parse, session } from "./security.js";
 import { idempotent, requireId } from "./catalog.js";
-import { bookingInput } from "./schemas.js";
+import { bookingInput, diningSegments } from "./schemas.js";
 
 function calendarDay(s) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
@@ -66,12 +66,7 @@ export function bookingRoutes(app, db) {
           roomName = room.name;
           estimate = Math.round(room.price * nights * 100) / 100;
         } else if (
-          ![
-            "Restaurantes",
-            "Cafeterias",
-            "Pizzarias",
-            "Bares e noite",
-          ].includes(b.data.segment) ||
+          !diningSegments.includes(b.data.segment) ||
           !/^([01]\d|2[0-3]):[0-5]\d$/.test(data.time) ||
           data.start + " " + data.time + ":00" <= now
         ) {

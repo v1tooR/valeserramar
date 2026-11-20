@@ -195,6 +195,26 @@ test("API com PostgreSQL: contrato, isolamento, aprovação, mídia e reservas",
     const b = businessSchema.parse(creates[0]);
     assert.equal(b.id, creates[1].id);
     assert.equal(b.status, "Rascunho");
+    await send("PATCH", `/businesses/${b.id}/table-reservations`, {
+      token,
+      body: { acceptsReservations: false },
+      status: 409,
+    });
+    await send("PATCH", `/businesses/${b.id}`, {
+      token,
+      body: { ...data, subcategory: "Estética e Beleza" },
+      status: 422,
+    });
+    const classified = await send("PATCH", `/businesses/${b.id}`, {
+      token,
+      body: { ...data, subcategory: "Lanchonetes" },
+    });
+    assert.equal(classified.subcategory, "Lanchonetes");
+    const editedByOldApp = await send("PATCH", `/businesses/${b.id}`, {
+      token,
+      body: data,
+    });
+    assert.equal(editedByOldApp.subcategory, "Lanchonetes");
     await send("POST", "/businesses", {
       token,
       body: { ...data, name: "Outro" },
@@ -246,6 +266,7 @@ test("API com PostgreSQL: contrato, isolamento, aprovação, mídia e reservas",
     await review("aprovar", b.id);
     const catalog = catalogSchema.parse(await send("GET", "/catalog"));
     assert.equal(catalog.businesses[0].owner, false);
+    assert.equal(catalog.businesses[0].subcategory, "Lanchonetes");
     assert.equal(catalog.products[0].id, p.id);
 
     const guest = (await send("POST", "/guest-sessions", { status: 201 }))
@@ -265,6 +286,27 @@ test("API com PostgreSQL: contrato, isolamento, aprovação, mídia e reservas",
       roomId: "",
       notes: "",
     };
+    const tableReservationsPath = `/businesses/${b.id}/table-reservations`;
+    await send("PATCH", tableReservationsPath, {
+      token: second,
+      body: { acceptsReservations: false },
+      status: 404,
+    });
+    const disabled = await send("PATCH", tableReservationsPath, {
+      token,
+      body: { acceptsReservations: false },
+    });
+    assert.equal(disabled.status, "Aprovado");
+    assert.equal(disabled.acceptsReservations, false);
+    const publicWithReservationsOff = await send("GET", "/catalog");
+    assert.equal(publicWithReservationsOff.businesses[0].id, b.id);
+    assert.equal(publicWithReservationsOff.businesses[0].acceptsReservations, false);
+    await send("POST", "/reservations", { guest, body: booking, status: 422 });
+    const enabled = await send("PATCH", tableReservationsPath, {
+      token,
+      body: { acceptsReservations: true },
+    });
+    assert.equal(enabled.acceptsReservations, true);
     await send("POST", "/reservations", {
       guest,
       body: { ...booking, start: "2020-01-01" },
@@ -289,6 +331,10 @@ test("API com PostgreSQL: contrato, isolamento, aprovação, mídia e reservas",
       ).id,
       r.id,
     );
+    await send("PATCH", tableReservationsPath, {
+      token,
+      body: { acceptsReservations: false },
+    });
     assert.equal(
       (await send("GET", "/reservations", { guest: otherGuest })).length,
       0,

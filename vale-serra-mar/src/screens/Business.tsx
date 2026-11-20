@@ -5,7 +5,14 @@ import { Image, Share, Text, View, useWindowDimensions } from "react-native";
 import { photoSource } from "../assets";
 import { useStore } from "../store";
 import { useNav, type ScreenProps } from "../navigation";
-import { isOpen, isRestaurant, money, filterBusinesses } from "../domain/logic";
+import {
+  canReserve,
+  filterBusinesses,
+  isOpen,
+  isRestaurant,
+  money,
+} from "../domain/logic";
+import { businessType } from "../domain/categories";
 import { contact, directions, openExternal } from "../services/external";
 import { colors as c, styles as s } from "../theme";
 import {
@@ -97,6 +104,7 @@ export function BusinessScreen({ route }: ScreenProps) {
     );
   const hotel = b.segment === "Hospedagem",
     restaurant = isRestaurant(b.segment),
+    reservationsAvailable = canReserve(b),
     favorite = state.favorites.includes(b.id);
   return (
     <Page
@@ -122,7 +130,7 @@ export function BusinessScreen({ route }: ScreenProps) {
                 onPress={() => nav.navigate("Menu", { businessId: b.id })}
               />
             )}
-            {b.acceptsReservations && (
+            {reservationsAvailable && (
               <Button
                 title={hotel ? "Solicitar reserva" : "Reservar mesa"}
                 icon="calendar"
@@ -130,7 +138,7 @@ export function BusinessScreen({ route }: ScreenProps) {
                 onPress={() => nav.navigate("Booking", { businessId: b.id })}
               />
             )}
-            {!restaurant && !b.acceptsReservations && (
+            {!restaurant && !reservationsAvailable && (
               <Button
                 title="Entrar em contato"
                 icon="message-circle"
@@ -157,7 +165,7 @@ export function BusinessScreen({ route }: ScreenProps) {
       </Pressable>
       <View style={s.between}>
         <View style={s.grow}>
-          <Text style={s.eyebrow}>{b.segment}</Text>
+          <Text style={s.eyebrow}>{businessType(b).label}</Text>
           <Text style={s.title}>{b.name}</Text>
           <Text style={s.muted}>
             {b.address}, {b.number} · {b.city}
@@ -185,6 +193,11 @@ export function BusinessScreen({ route }: ScreenProps) {
               : "Confira os horários"
         }
       />
+      {restaurant && !reservationsAvailable && (
+        <Notice tone="amber">
+          Este estabelecimento não disponibiliza reservas de mesa pelo app.
+        </Notice>
+      )}
       <View style={[s.row, { justifyContent: "space-around" }]}>
         {(
           [

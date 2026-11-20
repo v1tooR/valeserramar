@@ -2,9 +2,24 @@ import { Alert } from "../components/Dialogs";
 import { CollectionState } from "../components/CollectionState";
 import { Tap as Pressable } from "../components/Motion";
 import React, { useState } from "react";
-import { Image, ImageBackground, ScrollView, Text, View } from "react-native";
+import {
+  Image,
+  ImageBackground,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { assets, photoSource } from "../assets";
 import { regions, segments } from "../domain/catalog";
+import {
+  categoryForSelection,
+  exploreCategories,
+  foodTypes,
+  lodgingTypes,
+  type ExploreCategory,
+} from "../domain/categories";
 import { filterBusinesses } from "../domain/logic";
 import type { Filters } from "../domain/models";
 import { useStore } from "../store";
@@ -116,49 +131,93 @@ export function WelcomeScreen() {
     </Page>
   );
 }
-const categoryStyles: Record<string, { icon: IconName; color: string }> = {
-  Restaurantes: { icon: "coffee", color: "#FFA88A" },
-  Hospedagem: { icon: "home", color: "#A4E57D" },
-  Serviços: { icon: "tool", color: "#83C9FF" },
-  Lazer: { icon: "star", color: "#FFDB61" },
+const categoryStyles: Record<
+  ExploreCategory,
+  { icon: IconName; color: string; accent: string }
+> = {
+  Alimentação: {
+    icon: "coffee",
+    color: c.peach,
+    accent: "#884321",
+  },
+  Comércio: {
+    icon: "shopping-bag",
+    color: c.blue,
+    accent: "#265981",
+  },
+  "Estética e Beleza": {
+    icon: "scissors",
+    color: "#F3E8F7",
+    accent: "#69417D",
+  },
+  Hospedagem: {
+    icon: "home",
+    color: c.mint,
+    accent: c.green,
+  },
+  Lazer: {
+    icon: "sun",
+    color: c.yellow,
+    accent: c.amber,
+  },
+  Serviços: {
+    icon: "tool",
+    color: "#E9EEF5",
+    accent: "#45556D",
+  },
 };
-export function Categories({ all = false }: { all?: boolean }) {
+const categoryRows = [
+  exploreCategories.slice(0, 2),
+  exploreCategories.slice(2, 4),
+  exploreCategories.slice(4),
+];
+const homeCategories = [
+  { label: "Alimentação", category: "Alimentação" },
+  { label: "Hospedagem", category: "Hospedagem" },
+  { label: "Comércio", category: "Comércio" },
+  { label: "Serviço", category: "Serviços" },
+] as const satisfies readonly { label: string; category: ExploreCategory }[];
+function HomeCategories() {
   const nav = useNav();
   return (
-    <View style={[s.wrap, { justifyContent: "space-between" }]}>
-      {(all ? segments : Object.keys(categoryStyles)).map((category) => {
-        const style = categoryStyles[category] || {
-          icon: "shopping-bag" as IconName,
-          color: c.mint,
-        };
+    <View style={[s.row, { alignItems: "flex-start", gap: 6 }]}>
+      {homeCategories.map(({ label, category }) => {
+        const { icon, color } = categoryStyles[category];
         return (
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel={label}
             key={category}
             onPress={() => nav.navigate("Results", { category })}
             style={{
-              width: all ? "47%" : "22%",
               alignItems: "center",
               gap: 8,
-              paddingVertical: 10,
-              backgroundColor: all ? style.color : undefined,
-              borderRadius: 14,
+              flex: 1,
+              minWidth: 0,
+              paddingVertical: 6,
             }}
           >
             <View
               style={{
-                width: 54,
-                height: 54,
-                borderRadius: 28,
+                width: 48,
+                height: 48,
+                borderRadius: 15,
                 alignItems: "center",
                 justifyContent: "center",
-                backgroundColor: style.color,
+                backgroundColor: color,
               }}
             >
-              <Icon name={style.icon} />
+              <Icon name={icon} size={25} />
             </View>
-            <Text style={{ fontSize: 11, color: c.dark, fontWeight: "600" }}>
-              {category === "Restaurantes" ? "Alimentação" : category}
+            <Text
+              style={{
+                fontSize: 11,
+                color: c.dark,
+                fontWeight: "600",
+                textAlign: "center",
+              }}
+            >
+              {label}
             </Text>
           </Pressable>
         );
@@ -221,7 +280,7 @@ export function HomeScreen() {
         action="Ver todas"
         onPress={() => nav.navigate("Search")}
       />
-      <Categories />
+      <HomeCategories />
       <Section
         title={`Em destaque em ${state.city}`}
         action="Ver todos"
@@ -261,51 +320,195 @@ export function SearchScreen() {
   };
   return (
     <Page tab="Search">
-      <Field
-        label="Buscar no guia"
-        placeholder="Nome, categoria ou cidade"
-        value={query}
-        onChangeText={setQuery}
-        returnKeyType="search"
-        onSubmitEditing={() => search(query)}
-      />
-      <Button title="Buscar" icon="search" onPress={() => search(query)} />
-      <Section
-        title="Buscas recentes"
-        action="Limpar"
-        onPress={() => update((s) => ({ ...s, recent: [] }))}
-      />
-      {state.recent.length === 0 && (
-        <Text style={s.muted}>Suas próximas buscas aparecem aqui.</Text>
-      )}
-      {state.recent.map((text) => (
-        <Row
-          key={text}
-          title={text}
-          icon="clock"
-          onPress={() => search(text)}
-        />
-      ))}
-      <Section title="Buscar por categoria" />
-      <Categories all />
-      <Section title="Buscar por cidade" />
-      <View style={s.wrap}>
-        {regions
-          .flatMap((r) => r.cities)
-          .map((city) => (
-            <Chip
-              key={city}
-              title={city}
-              selected={state.city === city}
-              onPress={() => {
-                const region = regions.find((r) => r.cities.includes(city))!;
-                update((s) => ({ ...s, city, region: region.name }));
-                nav.navigate("Results");
-              }}
+      <View style={explore.section}>
+        <Text accessibilityRole="header" style={s.title}>
+          Explorar
+        </Text>
+        <View style={[s.row, explore.searchBar]}>
+          <TextInput
+            accessibilityLabel="Buscar no guia"
+            placeholder="Nome, categoria ou cidade"
+            placeholderTextColor="#586B61"
+            style={explore.searchInput}
+            value={query}
+            onChangeText={setQuery}
+            returnKeyType="search"
+            onSubmitEditing={() => search(query)}
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Buscar"
+            style={explore.searchButton}
+            onPress={() => search(query)}
+          >
+            <Icon name="search" size={22} color={c.white} />
+          </Pressable>
+        </View>
+      </View>
+      <View style={explore.section}>
+        <Section title="Buscar por categoria" />
+        <View style={explore.categoryGrid}>
+          {categoryRows.map((row) => (
+            <View key={row[0]} style={explore.categoryRow}>
+              {row.map((category) => {
+                const { icon, color, accent } = categoryStyles[category];
+                return (
+                  <Pressable
+                    key={category}
+                    accessibilityRole="button"
+                    accessibilityLabel={category}
+                    style={[explore.categoryCard, { backgroundColor: color }]}
+                    onPress={() => nav.navigate("Results", { category })}
+                  >
+                    <View style={explore.categoryCardTop}>
+                      <View style={explore.categoryIcon}>
+                        <Icon name={icon} size={36} color={accent} />
+                      </View>
+                      <Icon name="chevron-right" size={19} color={accent} />
+                    </View>
+                    <Text style={explore.categoryTitle}>{category}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ))}
+        </View>
+      </View>
+      {state.recent.length > 0 && (
+        <View style={explore.section}>
+          <Section
+            title="Buscas recentes"
+            action="Limpar"
+            onPress={() => update((s) => ({ ...s, recent: [] }))}
+          />
+          {state.recent.map((text) => (
+            <Row
+              key={text}
+              title={text}
+              icon="clock"
+              onPress={() => search(text)}
             />
           ))}
+        </View>
+      )}
+      <View style={explore.section}>
+        <Section title="Buscar por cidade" />
+        <View style={s.wrap}>
+          {regions.flatMap((region) =>
+            region.cities.map((city) => (
+              <Chip
+                key={city}
+                title={city}
+                selected={state.city === city}
+                onPress={() => {
+                  update((s) => ({ ...s, city, region: region.name }));
+                  nav.navigate("Results");
+                }}
+              />
+            )),
+          )}
+        </View>
       </View>
     </Page>
+  );
+}
+const explore = StyleSheet.create({
+  section: { gap: 12 },
+  searchBar: {
+    gap: 4,
+    padding: 5,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 16,
+    backgroundColor: c.soft,
+  },
+  searchInput: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 46,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: c.dark,
+  },
+  searchButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: c.green,
+  },
+  categoryGrid: { gap: 12 },
+  categoryRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: 12,
+  },
+  categoryCard: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 138,
+    padding: 12,
+    justifyContent: "space-between",
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#143D3114",
+    borderRadius: 18,
+  },
+  categoryCardTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 6,
+  },
+  categoryIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFFB3",
+  },
+  categoryTitle: {
+    minHeight: 42,
+    color: c.dark,
+    fontSize: 16,
+    fontWeight: "700",
+    lineHeight: 21,
+  },
+});
+function SubcategoryFilters({
+  category,
+  value,
+  onChange,
+}: {
+  category: ExploreCategory | undefined;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  if (category !== "Alimentação" && category !== "Hospedagem") return null;
+  const types = category === "Alimentação" ? foodTypes : lodgingTypes;
+
+  return (
+    <>
+      <Section title="Subcategorias" />
+      <View style={s.wrap}>
+        <Chip
+          title="Todas"
+          selected={value === category}
+          onPress={() => onChange(category)}
+        />
+        {types.map(({ label }) => (
+          <Chip
+            key={label}
+            title={label}
+            selected={value === label}
+            onPress={() => onChange(label)}
+          />
+        ))}
+      </View>
+    </>
   );
 }
 export function ResultsScreen({ route }: ScreenProps) {
@@ -321,6 +524,7 @@ export function ResultsScreen({ route }: ScreenProps) {
   const [allRegions, setAllRegions] = useState(
     route.params?.allRegions || false,
   );
+  const category = categoryForSelection(filters.segment);
   const results = filterBusinesses(
     state.businesses,
     filters,
@@ -338,7 +542,7 @@ export function ResultsScreen({ route }: ScreenProps) {
     );
   return (
     <Page
-      title="Explorar"
+      title={category || "Explorar"}
       tab="Search"
       right={
         <IconButton
@@ -353,6 +557,11 @@ export function ResultsScreen({ route }: ScreenProps) {
         placeholder="Nome, categoria ou cidade"
         value={query}
         onChangeText={setQuery}
+      />
+      <SubcategoryFilters
+        category={category}
+        value={filters.segment}
+        onChange={(segment) => setFilters((f) => ({ ...f, segment }))}
       />
       <View style={s.row}>
         <Chip title="Lista" selected onPress={() => {}} />
@@ -407,13 +616,17 @@ export function ResultsScreen({ route }: ScreenProps) {
             title="Buscar em todas as regiões"
             onPress={() => setAllRegions(true)}
           />
-          <Section title="Talvez você goste" />
-          {state.businesses
-            .filter((b) => b.status === "Aprovado")
-            .slice(0, 2)
-            .map((b) => (
-              <BusinessCard key={b.id} business={b} />
-            ))}
+          {!category && (
+            <>
+              <Section title="Talvez você goste" />
+              {state.businesses
+                .filter((b) => b.status === "Aprovado")
+                .slice(0, 2)
+                .map((b) => (
+                  <BusinessCard key={b.id} business={b} />
+                ))}
+            </>
+          )}
         </>
       )}
     </Page>
@@ -430,6 +643,7 @@ function FilterForm({
   onDone: () => void;
   count: number;
 }) {
+  const category = categoryForSelection(filters.segment);
   return (
     <Page
       title="Filtros"
@@ -465,15 +679,20 @@ function FilterForm({
           selected={!filters.segment}
           onPress={() => setFilters((f) => ({ ...f, segment: "" }))}
         />
-        {segments.map((segment) => (
+        {exploreCategories.map((name) => (
           <Chip
-            key={segment}
-            title={segment}
-            selected={filters.segment === segment}
-            onPress={() => setFilters((f) => ({ ...f, segment }))}
+            key={name}
+            title={name}
+            selected={category === name}
+            onPress={() => setFilters((f) => ({ ...f, segment: name }))}
           />
         ))}
       </View>
+      <SubcategoryFilters
+        category={category}
+        value={filters.segment}
+        onChange={(segment) => setFilters((f) => ({ ...f, segment }))}
+      />
       <Field
         label="Bairro (opcional)"
         value={filters.district}

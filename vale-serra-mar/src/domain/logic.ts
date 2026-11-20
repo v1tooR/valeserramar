@@ -5,6 +5,7 @@ import type {
   Reservation,
   Product,
 } from "./models";
+import { businessType, exploreCategories } from "./categories";
 export const money = (value: number) =>
   value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 export const normalize = (text: string) =>
@@ -17,6 +18,9 @@ export const isRestaurant = (segment: string) =>
   ["Restaurantes", "Cafeterias", "Pizzarias", "Bares e noite"].includes(
     segment,
   );
+export const canReserve = (business: Business) =>
+  business.acceptsReservations &&
+  (business.segment === "Hospedagem" || isRestaurant(business.segment));
 export const cartTotal = (items: CartItem[]) =>
   items.reduce(
     (sum, item) =>
@@ -99,21 +103,29 @@ export function filterBusinesses(
   now = new Date(),
 ) {
   const term = normalize(query);
-  return businesses.filter(
-    (b) =>
+  const selectedCategory = exploreCategories.find(
+    (category) => category === filters.segment,
+  );
+  return businesses.filter((b) => {
+    const type = businessType(b);
+    return (
       b.status === "Aprovado" &&
       (!region || b.region === region) &&
       (!filters.city || b.city === filters.city) &&
-      (!filters.segment || b.segment === filters.segment) &&
+      (!filters.segment ||
+        (selectedCategory
+          ? type.category === selectedCategory
+          : b.segment === filters.segment || type.label === filters.segment)) &&
       (!filters.district || b.district === filters.district) &&
       (!filters.openNow || isOpen(b, now)) &&
       (!filters.menu || isRestaurant(b.segment)) &&
-      (!filters.reservations || b.acceptsReservations) &&
+      (!filters.reservations || canReserve(b)) &&
       (!term ||
-        normalize(`${b.name} ${b.segment} ${b.description} ${b.city}`).includes(
-          term,
-        )),
-  );
+        normalize(
+          `${b.name} ${b.segment} ${type.label} ${type.category ?? ""} ${b.description} ${b.city}`,
+        ).includes(term))
+    );
+  });
 }
 export function validateReservation(
   r: Omit<Reservation, "id" | "createdAt" | "status" | "reply">,

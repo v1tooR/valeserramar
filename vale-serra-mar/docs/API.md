@@ -36,12 +36,17 @@ Os campos exatos estão em `src/api/schemas.ts` e `src/domain/models.ts`. Busine
 | POST /media | multipart/form-data campo file → `{url}` HTTPS |
 | POST /businesses | Campos editáveis de Business → Business persistido |
 | PATCH /businesses/:id | Campos editáveis de Business → Business persistido |
+| PATCH /businesses/:id/table-reservations | `{acceptsReservations: boolean}` → Business com a preferência atualizada |
 | POST /businesses/:id/submit | `{}` → Business com status atribuído pelo servidor |
 | POST /businesses/:id/products | Campos de Product exceto id → Product persistido |
 | PATCH /businesses/:id/products/:productId | Campos editáveis → Product persistido |
 | DELETE /businesses/:id/products/:productId | → 204 |
 
 Campos id, owner, status e correction são removidos do corpo de edição de negócio. Acomodações são editadas como a lista rooms do negócio, com IDs de acomodação estáveis. Produtos e acomodações novos recebem identificadores temporários com prefixo draft-. O servidor pode substituir IDs temporários ao persistir e deve preservar os definitivos nas atualizações. O cadastro do negócio pode ocorrer antes de enviar produtos e antes da submissão final. Falha parcial conserva o cadastro retornado para permitir retomada na mesma sessão.
+
+`subcategory` é opcional e mantém `segment` compatível com cadastros existentes. Envie `null` para remover uma subcategoria. O proprietário de um anúncio de alimentação publicado pode alterar a disponibilidade de mesas pela rota `table-reservations`. A alteração preserva a publicação e as solicitações já recebidas.
+
+`lodgingType` é opcional para anúncios do segmento `Hospedagem` e aceita `Hotéis`, `Pousadas` ou `Airbnb`. Edições que omitem o campo mantêm o subtipo do anúncio no mesmo segmento. Envie `null` para limpar o subtipo.
 
 O cliente envia Idempotency-Key nas criações de negócio/produto e de reserva. O servidor deve vincular a chave à identidade + operação, armazenar a resposta e evitar duplicidade no retry. Mesma chave com corpo diferente deve retornar 409. A submissão para análise deve ser naturalmente idempotente no estado Em análise, sem impedir um reenvio posterior após correções.
 

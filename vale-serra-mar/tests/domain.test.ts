@@ -104,6 +104,46 @@ it("busca ignora acentos e esconde anúncios não aprovados", () => {
     ),
   ).toEqual([]);
 });
+it("filtra categorias e separa subcategorias com o mesmo segmento", () => {
+  const lodging = { ...businesses[0], segment: "Hospedagem" as const };
+  const places = [
+    ...businesses,
+    { ...businesses[1], id: "doceria", subcategory: "Doceria" as const },
+    { ...businesses[0], id: "lanches", subcategory: "Lanches" as const },
+    { ...lodging, id: "hotel", lodgingType: "Hotéis" as const },
+    { ...lodging, id: "pousada", lodgingType: "Pousadas" as const },
+    { ...lodging, id: "airbnb", lodgingType: "Airbnb" as const },
+    { ...lodging, id: "hospedagem-antiga" },
+    { ...businesses[0], id: "lazer", segment: "Lazer" as const },
+    { ...businesses[0], id: "servico", segment: "Serviços" as const },
+    {
+      ...businesses[0],
+      id: "salao",
+      segment: "Serviços" as const,
+      subcategory: "Estética e Beleza" as const,
+    },
+  ];
+  const ids = (segment: string) =>
+    filterBusinesses(places, { ...filters, segment }, "", "").map((b) => b.id);
+
+  expect(ids("Alimentação")).toEqual(["quintal", "cafe", "doceria", "lanches"]);
+  expect(ids("Restaurante")).toEqual(["quintal"]);
+  expect(ids("Cafeteria")).toEqual(["cafe"]);
+  expect(ids("Doceria")).toEqual(["doceria"]);
+  expect(ids("Lanches")).toEqual(["lanches"]);
+  expect(ids("Hospedagem")).toEqual([
+    "hotel",
+    "pousada",
+    "airbnb",
+    "hospedagem-antiga",
+  ]);
+  expect(ids("Hotéis")).toEqual(["hotel"]);
+  expect(ids("Pousadas")).toEqual(["pousada"]);
+  expect(ids("Airbnb")).toEqual(["airbnb"]);
+  expect(ids("Lazer")).toEqual(["lazer"]);
+  expect(ids("Serviços")).toEqual(["servico"]);
+  expect(ids("Estética e Beleza")).toEqual(["salao"]);
+});
 it("considera expediente atravessando meia-noite no fuso de São Paulo", () => {
   const b = {
     ...businesses[0],

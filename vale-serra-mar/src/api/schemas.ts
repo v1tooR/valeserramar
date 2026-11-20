@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  businessSubcategories,
+  lodgingSubcategories,
+} from "../domain/categories";
 const photo = z.string();
 const hours = z.object({
   day: z.string(),
@@ -27,6 +31,8 @@ export const businessSchema = z.object({
     "Lazer",
     "Comércio",
   ]),
+  subcategory: z.enum(businessSubcategories).nullish(),
+  lodgingType: z.enum(lodgingSubcategories).nullish(),
   region: z.string(),
   city: z.string(),
   district: z.string(),

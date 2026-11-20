@@ -5,6 +5,7 @@ import React, { useRef, useState } from "react";
 import { Image, Text, View } from "react-native";
 import { photoSource } from "../assets";
 import {
+  canReserve,
   dateKey,
   displayDate,
   money,
@@ -47,7 +48,7 @@ export function BookingScreen({ route }: ScreenProps) {
     [phone, setPhone] = useState(state.profile?.phone || ""),
     [notes, setNotes] = useState("");
   const [error, setError] = useState("");
-  if (!b || b.status !== "Aprovado" || !b.acceptsReservations)
+  if (!b || b.status !== "Aprovado" || !canReserve(b))
     return (
       <Page title="Reservar">
         <Notice>

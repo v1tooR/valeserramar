@@ -1,4 +1,4 @@
-import { beforeEach, expect, it, jest } from "@jest/globals";
+import { afterAll, beforeEach, expect, it, jest } from "@jest/globals";
 jest.mock("expo-secure-store", () => ({
   getItemAsync: jest.fn<() => Promise<null>>().mockResolvedValue(null),
   setItemAsync: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
@@ -7,11 +7,11 @@ jest.mock("expo-secure-store", () => ({
 process.env.EXPO_PUBLIC_API_URL = "https://api.invalid";
 const { request, setAccessToken, setUnauthorizedHandler } =
   require("../src/api/client") as typeof import("../src/api/client");
-const fetchMock = jest.fn<typeof fetch>();
+const fetchMock = jest.spyOn(globalThis, "fetch");
 beforeEach(() => {
   fetchMock.mockReset();
-  global.fetch = fetchMock;
 });
+afterAll(() => fetchMock.mockRestore());
 it("envia JSON e token recebido do servidor", async () => {
   await setAccessToken("session");
   fetchMock.mockResolvedValue({

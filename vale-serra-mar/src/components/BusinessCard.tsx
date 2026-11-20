@@ -4,6 +4,7 @@ import { Image, Text, View } from "react-native";
 import { photoSource } from "../assets";
 import type { Business } from "../domain/models";
 import { isOpen, isRestaurant } from "../domain/logic";
+import { businessType } from "../domain/categories";
 import { useStore } from "../store";
 import { useNav } from "../navigation";
 import { colors as c, styles as s } from "../theme";
@@ -34,7 +35,7 @@ export function BusinessCard({
           resizeMode="cover"
         />
         <View style={s.grow}>
-          <Text style={s.eyebrow}>{b.segment}</Text>
+          <Text style={s.eyebrow}>{businessType(b).label}</Text>
           <Text style={[s.body, { fontWeight: "700" }]}>{b.name}</Text>
           <Text style={s.muted}>
             {b.district} · {b.city}

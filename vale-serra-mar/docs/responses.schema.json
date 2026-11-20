@@ -59,6 +59,38 @@
           "Comércio"
         ]
       },
+      "subcategory": {
+        "anyOf": [
+          {
+            "type": "string",
+            "enum": [
+              "Lanches",
+              "Doceria",
+              "Lanchonetes",
+              "Padaria",
+              "Estética e Beleza"
+            ]
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "lodgingType": {
+        "anyOf": [
+          {
+            "type": "string",
+            "enum": [
+              "Hotéis",
+              "Pousadas",
+              "Airbnb"
+            ]
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
       "region": {
         "type": "string"
       },
@@ -277,6 +309,38 @@
                 "Serviços",
                 "Lazer",
                 "Comércio"
+              ]
+            },
+            "subcategory": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "Lanches",
+                    "Doceria",
+                    "Lanchonetes",
+                    "Padaria",
+                    "Estética e Beleza"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "lodgingType": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "Hotéis",
+                    "Pousadas",
+                    "Airbnb"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
               ]
             },
             "region": {
@@ -794,6 +858,38 @@
                 "Serviços",
                 "Lazer",
                 "Comércio"
+              ]
+            },
+            "subcategory": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "Lanches",
+                    "Doceria",
+                    "Lanchonetes",
+                    "Padaria",
+                    "Estética e Beleza"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "lodgingType": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "Hotéis",
+                    "Pousadas",
+                    "Airbnb"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
               ]
             },
             "region": {

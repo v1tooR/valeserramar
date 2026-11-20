@@ -3,9 +3,10 @@ import { Tap as Pressable } from "../components/Motion";
 import React, { useState } from "react";
 import { Image, Text, View } from "react-native";
 import { assets, photoSource } from "../assets";
-import { hours, emptyBusiness, regions, segments } from "../domain/catalog";
+import { emptyBusiness, regions } from "../domain/catalog";
+import { businessType, businessTypes } from "../domain/categories";
 import { isRestaurant, money, validPhone, validTime } from "../domain/logic";
-import type { Business, Segment } from "../domain/models";
+import type { Business } from "../domain/models";
 import { uid, useStore } from "../store";
 import { useNav, type ScreenProps } from "../navigation";
 import { colors as c, styles as s } from "../theme";
@@ -84,7 +85,13 @@ export function AuthScreen() {
     [email, setEmail] = useState(""),
     [phone, setPhone] = useState(""),
     [password, setPassword] = useState(""),
+    [showPassword, setShowPassword] = useState(false),
     [error, setError] = useState("");
+  const selectMode = (next: boolean) => {
+    if (next !== create) setShowPassword(false);
+    setCreate(next);
+    setError("");
+  };
   const submit = async () => {
     setError("");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
@@ -115,18 +122,12 @@ export function AuthScreen() {
         <Chip
           title="Entrar"
           selected={!create}
-          onPress={() => {
-            setCreate(false);
-            setError("");
-          }}
+          onPress={() => selectMode(false)}
         />
         <Chip
           title="Criar conta"
           selected={create}
-          onPress={() => {
-            setCreate(true);
-            setError("");
-          }}
+          onPress={() => selectMode(true)}
         />
       </View>
       {create && (
@@ -157,9 +158,16 @@ export function AuthScreen() {
         label="Senha"
         value={password}
         onChangeText={setPassword}
-        secureTextEntry
+        secureTextEntry={!showPassword}
         autoCapitalize="none"
+        autoCorrect={false}
+        spellCheck={false}
         autoComplete={create ? "new-password" : "current-password"}
+        action={{
+          icon: showPassword ? "eye-off" : "eye",
+          label: showPassword ? "Ocultar senha" : "Mostrar senha",
+          onPress: () => setShowPassword((visible) => !visible),
+        }}
       />
       {error && <Notice tone="red">{error}</Notice>}
       <Button
@@ -282,6 +290,9 @@ export function BusinessFields({
   business: Business;
   onChange: (patch: Partial<Business>) => void;
 }) {
+  const hotel = b.segment === "Hospedagem";
+  const restaurant = isRestaurant(b.segment);
+  const selectedType = businessType(b).label;
   return (
     <>
       <Field
@@ -290,20 +301,26 @@ export function BusinessFields({
         onChangeText={(name) => onChange({ name })}
         maxLength={90}
       />
-      <Section title="Categoria *" />
+      <Section title="Tipo de estabelecimento *" />
       <View style={s.wrap}>
-        {segments.map((segment) => (
+        {businessTypes.map(({ label, segment, subcategory, lodgingType }) => (
           <Chip
-            key={segment}
-            title={segment}
-            selected={b.segment === segment}
-            onPress={() =>
+            key={label}
+            title={label}
+            selected={selectedType === label}
+            onPress={() => {
+              const sameReservationType =
+                b.segment === segment ||
+                (restaurant && isRestaurant(segment));
               onChange({
                 segment,
-                acceptsReservations:
-                  segment === "Hospedagem" || segment === "Restaurantes",
-              })
-            }
+                subcategory: subcategory ?? null,
+                lodgingType: lodgingType ?? null,
+                acceptsReservations: sameReservationType
+                  ? b.acceptsReservations
+                  : segment === "Hospedagem",
+              });
+            }}
           />
         ))}
       </View>
@@ -314,10 +331,14 @@ export function BusinessFields({
         multiline
         maxLength={500}
       />
-      {(isRestaurant(b.segment) || b.segment === "Hospedagem") && (
+      {(hotel || (restaurant && b.status !== "Aprovado")) && (
         <Toggle
-          title="Receber solicitações de reserva"
-          subtitle="Confirmação manual"
+          title={hotel ? "Receber solicitações de reserva" : "Aceitar reservas de mesa"}
+          subtitle={
+            hotel
+              ? "Confirmação manual"
+              : "Permite que visitantes solicitem uma mesa pelo app."
+          }
           value={b.acceptsReservations}
           onChange={(acceptsReservations) => onChange({ acceptsReservations })}
         />
@@ -784,7 +805,7 @@ export function BusinessWizardScreen({ route }: ScreenProps) {
             style={{ width: "100%", height: 210, borderRadius: 16 }}
           />
           <Text style={s.heading}>{b.name}</Text>
-          <Badge text={b.segment} />
+          <Badge text={businessType(b).label} />
           <Text style={s.body}>{b.description}</Text>
           <Text style={s.muted}>
             {b.address}, {b.number} · {b.city}

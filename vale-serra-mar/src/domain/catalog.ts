@@ -65,7 +65,7 @@ export function emptyBusiness(id: string): Business {
     photo: "",
     gallery: [],
     hours: hours(),
-    acceptsReservations: true,
+    acceptsReservations: false,
     amenities: [],
     rooms: [],
     checkIn: "14:00",

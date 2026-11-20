@@ -317,7 +317,7 @@ export function CartScreen() {
           <Button
             title="Explorar restaurantes"
             onPress={() =>
-              nav.navigate("Results", { category: "Restaurantes" })
+              nav.navigate("Results", { category: "Alimentação" })
             }
           />
         </>

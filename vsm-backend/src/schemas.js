@@ -14,19 +14,30 @@ const room = z.object({
   guests: z.number().int().positive(),
   photo,
 });
+export const diningSegments = [
+  "Restaurantes",
+  "Cafeterias",
+  "Pizzarias",
+  "Bares e noite",
+];
+const subcategorySegments = {
+  Lanches: "Restaurantes",
+  Doceria: "Cafeterias",
+  Lanchonetes: "Restaurantes",
+  Padaria: "Cafeterias",
+  "Estética e Beleza": "Serviços",
+};
 export const businessSchema = z.object({
   id: z.string(),
   name: z.string(),
   segment: z.enum([
-    "Restaurantes",
-    "Cafeterias",
-    "Pizzarias",
-    "Bares e noite",
+    ...diningSegments,
     "Hospedagem",
     "Serviços",
     "Lazer",
     "Comércio",
   ]),
+  subcategory: z.enum(Object.keys(subcategorySegments)).nullish(),
   region: z.string(),
   city: z.string(),
   district: z.string(),
@@ -139,6 +150,9 @@ const image = z
   .string()
   .max(1024)
   .refine((value) => !value || /^https:\/\//.test(value));
+export const tableReservationsInput = z.strictObject({
+  acceptsReservations: z.boolean(),
+});
 export const businessInput = businessSchema
   .omit({ id: true, owner: true, status: true, correction: true })
   .extend({
@@ -155,6 +169,9 @@ export const businessInput = businessSchema
       )
       .max(100),
   })
+  .refine(
+    (b) => !b.subcategory || subcategorySegments[b.subcategory] === b.segment,
+  )
   .refine((b) =>
     regions.some((r) => r.name === b.region && r.cities.includes(b.city)),
   )

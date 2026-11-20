@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { row, rows, transaction } from "./db.js";
 import { fail, hash, parse, session } from "./security.js";
-import { businessInput, productInput } from "./schemas.js";
+import {
+  businessInput,
+  diningSegments,
+  productInput,
+  tableReservationsInput,
+} from "./schemas.js";
 
 export const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -147,6 +152,8 @@ export function catalogRoutes(app, db, origin) {
         if (["Em análise", "Desativado"].includes(b.status))
           fail(409, "O anúncio não pode ser editado neste estado.");
         await checkImages(client, images, accountId, origin);
+        if (data.subcategory === undefined && data.segment === b.data.segment)
+          data.subcategory = b.data.subcategory;
         const changed = await row(
           client,
           "UPDATE vsm.businesses SET data=$2, status=CASE WHEN status='Aprovado' THEN 'Rascunho' ELSE status END WHERE id=$1 RETURNING *",
@@ -175,6 +182,26 @@ export function catalogRoutes(app, db, origin) {
   };
   app.post("/businesses", saveBusiness);
   app.patch("/businesses/:id", saveBusiness);
+  app.patch("/businesses/:id/table-reservations", async (req) => {
+    const { accountId } = await session(db, req);
+    const { acceptsReservations } = parse(tableReservationsInput, req.body);
+    return transaction(db, async (client) => {
+      const business = await owned(client, req.params.id, accountId, true);
+      if (business.status !== "Aprovado")
+        fail(
+          409,
+          "O anúncio deve estar publicado para alterar reservas de mesa.",
+        );
+      if (!diningSegments.includes(business.data.segment))
+        fail(422, "Este tipo de estabelecimento não recebe reservas de mesa.");
+      const updated = await row(
+        client,
+        "UPDATE vsm.businesses SET data=$2 WHERE id=$1 RETURNING *",
+        [business.id, { ...business.data, acceptsReservations }],
+      );
+      return businessView(updated, true);
+    });
+  });
   app.post("/businesses/:id/submit", async (req) => {
     const { accountId } = await session(db, req);
     return transaction(db, async (client) => {
@@ -210,11 +237,7 @@ export function catalogRoutes(app, db, origin) {
     if (data.businessId !== id) fail(422, "Estabelecimento inválido.");
     const work = async (client) => {
       const business = await owned(client, id, accountId, true);
-      if (
-        !["Restaurantes", "Cafeterias", "Pizzarias", "Bares e noite"].includes(
-          business.data.segment,
-        )
-      )
+      if (!diningSegments.includes(business.data.segment))
         fail(422, "Cardápio indisponível para este segmento.");
       if (["Em análise", "Desativado"].includes(business.status))
         fail(409, "O anúncio está bloqueado para edição.");
