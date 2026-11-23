@@ -13,6 +13,7 @@ import {
   money,
 } from "../domain/logic";
 import { businessType } from "../domain/categories";
+import { regionForCity } from "../domain/catalog";
 import { contact, directions, openExternal } from "../services/external";
 import { colors as c, styles as s } from "../theme";
 import {
@@ -34,15 +35,17 @@ export function MapScreen({ route }: ScreenProps) {
   const { state } = useStore(),
     nav = useNav();
   const { height } = useWindowDimensions();
+  const filters = {
+    ...emptyFilters,
+    segment: route.params?.category || "",
+    ...route.params?.filters,
+  };
+  const region = route.params?.allRegions ? "" : regionForCity(filters.city) ?? state.region;
   const businesses = filterBusinesses(
     state.businesses,
-    {
-      ...emptyFilters,
-      segment: route.params?.category || "",
-      ...route.params?.filters,
-    },
+    filters,
     route.params?.query || "",
-    route.params?.allRegions ? "" : state.region,
+    region,
   );
   const located = locatedBusinesses(businesses);
   const [selectedId, setSelectedId] = useState("");
@@ -59,7 +62,7 @@ export function MapScreen({ route }: ScreenProps) {
       >
         <BusinessMap
           businesses={located}
-          region={route.params?.allRegions ? "" : state.region}
+          region={region}
           onSelect={(b) => setSelectedId(b.id)}
         />
       </View>

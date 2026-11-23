@@ -10,11 +10,16 @@ const config: ExpoConfig = {
     },
   },
   version: "0.2.0",
+  icon: "./assets/app-icon.png",
   orientation: "portrait",
   userInterfaceStyle: "light",
   scheme: "valeserramar",
   android: {
     package: "br.com.valeserramar.guia",
+    adaptiveIcon: {
+      foregroundImage: "./assets/app-icon-foreground.png",
+      backgroundColor: "#08392F",
+    },
     config: {
       googleMaps: {
         apiKey: process.env.GOOGLE_MAPS_API_KEY || "",

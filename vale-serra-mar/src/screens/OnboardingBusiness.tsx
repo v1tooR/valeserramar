@@ -108,7 +108,7 @@ export function AuthScreen() {
     nav.replace("Dashboard");
   };
   return (
-    <Page title="Área do anunciante">
+    <Page title="Área do anunciante" keyboardAware>
       <Text style={s.eyebrow}>Seu negócio, mais perto das pessoas</Text>
       <Text style={s.title}>
         {create ? "Crie sua conta" : "Bom ter você de volta"}
@@ -303,7 +303,7 @@ export function BusinessFields({
       />
       <Section title="Tipo de estabelecimento *" />
       <View style={s.wrap}>
-        {businessTypes.map(({ label, segment, subcategory, lodgingType }) => (
+        {businessTypes.map(({ label, segment, subcategory, lodgingType, serviceType }) => (
           <Chip
             key={label}
             title={label}
@@ -316,6 +316,7 @@ export function BusinessFields({
                 segment,
                 subcategory: subcategory ?? null,
                 lodgingType: lodgingType ?? null,
+                serviceType: serviceType ?? null,
                 acceptsReservations: sameReservationType
                   ? b.acceptsReservations
                   : segment === "Hospedagem",
@@ -510,6 +511,9 @@ export function PhotosFields({
         Escolha imagens de até 8 MB que apresentem bem o seu espaço.
       </Text>
       <Section title="Capa do anúncio" />
+      <Text style={s.muted}>
+        Quando seu estabelecimento estiver em destaque, a capa será exibida como banner.
+      </Text>
       <Image
         source={photoSource(b.photo)}
         style={{ width: "100%", height: 190, borderRadius: 16 }}

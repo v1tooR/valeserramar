@@ -16,6 +16,7 @@ import {
   Text,
   TextInput,
   View,
+  type LayoutChangeEvent,
   type TextInputProps,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -473,6 +474,7 @@ export function Page({
   brand,
   right,
   scroll = true,
+  keyboardAware = false,
 }: {
   children: React.ReactNode;
   title?: string;
@@ -483,9 +485,37 @@ export function Page({
   brand?: boolean;
   right?: React.ReactNode;
   scroll?: boolean;
+  keyboardAware?: boolean;
 }) {
   const nav = useNav(),
     { storageError, loading, refresh } = useStore();
+  const formScroll = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const formHeight = useRef(0);
+  const androidForm = keyboardAware && Platform.OS === "android";
+  const iosForm = keyboardAware && Platform.OS === "ios";
+  const keyboardBehavior = androidForm
+    ? "height"
+    : Platform.OS === "ios" && !iosForm
+      ? "padding"
+      : undefined;
+
+  function onFormLayout({ nativeEvent: { layout } }: LayoutChangeEvent) {
+    const shrank = layout.height < formHeight.current;
+    formHeight.current = layout.height;
+    if (!shrank || layout.height <= 0) return;
+
+    const viewport = formScroll.current;
+    const content = viewport?.getInnerViewRef();
+    const field = TextInput.State.currentlyFocusedInput();
+    if (!content || !field || !viewport) return;
+
+    field.measureLayout(content, (_x, top, _width, height) => {
+      if (TextInput.State.currentlyFocusedInput() !== field) return;
+      const offset = top + height + 16 - formHeight.current;
+      if (offset > 0) viewport.scrollTo({ y: offset, animated: true });
+    });
+  }
+
   const content = (
     <Entrance style={{ padding: 20, gap: 20 }}>
       {brand && <BrandHeader />}
@@ -499,7 +529,7 @@ export function Page({
     >
       <KeyboardAvoidingView
         style={{ flex: 1, minHeight: 0 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={keyboardBehavior}
       >
         {title && (
           <View style={u.header}>
@@ -533,7 +563,10 @@ export function Page({
         {!!storageError && <Notice tone="red">{storageError}</Notice>}
         {scroll ? (
           <ScrollView
+            ref={androidForm ? formScroll : undefined}
             style={{ flex: 1, minHeight: 0 }}
+            automaticallyAdjustKeyboardInsets={iosForm}
+            onLayout={androidForm ? onFormLayout : undefined}
             refreshControl={
               tab ? (
                 <RefreshControl

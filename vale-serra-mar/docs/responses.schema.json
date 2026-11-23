@@ -91,6 +91,17 @@
           }
         ]
       },
+      "serviceType": {
+        "anyOf": [
+          {
+            "type": "string",
+            "const": "Agência de Publicidade"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
       "region": {
         "type": "string"
       },
@@ -252,6 +263,40 @@
       },
       "owner": {
         "type": "boolean"
+      },
+      "highlights": {
+        "type": "object",
+        "properties": {
+          "home": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 15
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "explore": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 15
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "home",
+          "explore"
+        ],
+        "additionalProperties": false
       }
     },
     "required": [
@@ -337,6 +382,17 @@
                     "Pousadas",
                     "Airbnb"
                   ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "serviceType": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "const": "Agência de Publicidade"
                 },
                 {
                   "type": "null"
@@ -504,6 +560,40 @@
             },
             "owner": {
               "type": "boolean"
+            },
+            "highlights": {
+              "type": "object",
+              "properties": {
+                "home": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 15
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "explore": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 15
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "home",
+                "explore"
+              ],
+              "additionalProperties": false
             }
           },
           "required": [
@@ -892,6 +982,17 @@
                 }
               ]
             },
+            "serviceType": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "const": "Agência de Publicidade"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "region": {
               "type": "string"
             },
@@ -1053,6 +1154,40 @@
             },
             "owner": {
               "type": "boolean"
+            },
+            "highlights": {
+              "type": "object",
+              "properties": {
+                "home": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 15
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "explore": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 15
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "home",
+                "explore"
+              ],
+              "additionalProperties": false
             }
           },
           "required": [

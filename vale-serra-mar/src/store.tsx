@@ -18,6 +18,7 @@ import type {
 import {
   ApiError,
   apiConfigured,
+  asaasSandboxEnabled,
   ensureGuest,
   errorMessage,
   hasGuestSession,
@@ -27,7 +28,9 @@ import {
 } from "./api/client";
 import { repository } from "./api/repository";
 import { preferencesSchema } from "./api/schemas";
-const STORAGE_KEY = "vale-serra-mar:preferences:v2";
+const STORAGE_KEY = asaasSandboxEnabled
+  ? "vale-serra-mar:asaas-sandbox:preferences:v2"
+  : "vale-serra-mar:preferences:v2";
 export const uid = () => Crypto.randomUUID();
 type Store = {
   state: State;

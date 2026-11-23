@@ -1,4 +1,4 @@
-import type { BusinessSubcategory, LodgingType } from "./categories";
+import type { BusinessSubcategory, LodgingType, ServiceType } from "./categories";
 
 export type Segment =
   | "Restaurantes"
@@ -49,12 +49,15 @@ export interface Room {
   guests: number;
   photo: Photo;
 }
+export type HighlightPlacement = "home" | "explore";
+
 export interface Business {
   id: string;
   name: string;
   segment: Segment;
   subcategory?: BusinessSubcategory | null;
   lodgingType?: LodgingType | null;
+  serviceType?: ServiceType | null;
   region: string;
   city: string;
   district: string;
@@ -78,6 +81,7 @@ export interface Business {
   status: ReviewStatus;
   correction: string;
   owner: boolean;
+  highlights?: Record<HighlightPlacement, number | null>;
 }
 export interface Reservation {
   id: string;

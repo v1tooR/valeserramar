@@ -9,6 +9,7 @@ export const regions = [
       "São José dos Campos",
       "Aparecida",
       "Cunha",
+      "Paraibuna",
     ],
     photo: assets.valley,
   },
@@ -18,6 +19,7 @@ export const regions = [
       "Campos do Jordão",
       "Santo Antônio do Pinhal",
       "São Bento do Sapucaí",
+      "Monteiro Lobato",
     ],
     photo: assets.mountain,
   },
@@ -27,6 +29,10 @@ export const regions = [
     photo: assets.landscape,
   },
 ];
+export function regionForCity(city: string) {
+  return regions.find((region) => region.cities.includes(city))?.name;
+}
+
 export const segments: Segment[] = [
   "Restaurantes",
   "Cafeterias",

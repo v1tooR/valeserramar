@@ -2,6 +2,7 @@ import type {
   Business,
   CartItem,
   Filters,
+  HighlightPlacement,
   Reservation,
   Product,
 } from "./models";
@@ -95,6 +96,25 @@ export function isOpen(business: Business, now = new Date()) {
       (to < from ? minutes >= from : minutes >= from && minutes < to))
   );
 }
+export function highlightedBusinesses(
+  businesses: Business[],
+  placement: HighlightPlacement,
+) {
+  return businesses
+    .flatMap((business) => {
+      const slot = business.highlights?.[placement];
+      return business.status === "Aprovado" &&
+        typeof business.photo === "string" &&
+        business.photo.trim() &&
+        slot != null
+        ? [{ business, slot }]
+        : [];
+    })
+    .sort((a, b) => a.slot - b.slot)
+    .slice(0, 15)
+    .map(({ business }) => business);
+}
+
 export function filterBusinesses(
   businesses: Business[],
   filters: Filters,

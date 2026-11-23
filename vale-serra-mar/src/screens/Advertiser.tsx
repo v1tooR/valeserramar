@@ -1,4 +1,5 @@
         import { Alert } from "../components/Dialogs";
+import { asaasSandboxEnabled } from "../api/client";
 import { repository } from "../api/repository";
 import { useRemote, RemoteStatus } from "../components/RemoteStatus";
 import React, { useState } from "react";
@@ -22,6 +23,7 @@ import {
   Toggle,
 } from "../components/ui";
 import { Calendar } from "../components/Calendar";
+import { SandboxSubscription } from "./SandboxSubscription";
 export function ReviewStatusScreen({ route }: ScreenProps) {
   const { state } = useStore(),
     nav = useNav();
@@ -466,9 +468,17 @@ export function AccountScreen() {
 }
 export function SubscriptionScreen() {
   const { state } = useStore();
+  return asaasSandboxEnabled ? (
+    <SandboxSubscription businessId={state.businessId.startsWith("draft-") ? "" : state.businessId} />
+  ) : (
+    <SubscriptionDetails businessId={state.businessId} />
+  );
+}
+
+function SubscriptionDetails({ businessId }: { businessId: string }) {
   const data = useRemote(
-    () => repository.subscription(state.businessId),
-    [state.businessId],
+    () => repository.subscription(businessId),
+    [businessId],
   );
   return (
     <Page title="Assinatura">

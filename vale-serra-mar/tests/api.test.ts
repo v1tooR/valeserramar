@@ -12,6 +12,22 @@ beforeEach(() => {
   fetchMock.mockReset();
 });
 afterAll(() => fetchMock.mockRestore());
+it.each([
+  ["https://api.valeserraemar.com.br/", "1", false],
+  ["https://sandbox.example.test", "1", true],
+  ["https://sandbox.example.test", "0", false],
+])("usa a configuração de assinatura correta para %s com modo %s", (url, mode, expected) => {
+  const previous = process.env;
+  try {
+    process.env = { ...previous, EXPO_PUBLIC_API_URL: url, EXPO_PUBLIC_ASAAS_SANDBOX: mode };
+    jest.isolateModules(() => {
+      const { asaasSandboxEnabled } = require("../src/api/client") as typeof import("../src/api/client");
+      expect(asaasSandboxEnabled).toBe(expected);
+    });
+  } finally {
+    process.env = previous;
+  }
+});
 it("envia JSON e token recebido do servidor", async () => {
   await setAccessToken("session");
   fetchMock.mockResolvedValue({

@@ -1,6 +1,10 @@
 import type { Business, Segment } from "./models";
 
+export const advertisingAgency = "Agência de Publicidade";
+export type ServiceType = typeof advertisingAgency;
+
 export const exploreCategories = [
+  advertisingAgency,
   "Alimentação",
   "Comércio",
   "Estética e Beleza",
@@ -33,6 +37,7 @@ type BusinessType = {
   category?: ExploreCategory;
   subcategory?: BusinessSubcategory;
   lodgingType?: LodgingType;
+  serviceType?: ServiceType;
 };
 
 function subcategoryType(
@@ -67,6 +72,12 @@ export const lodgingTypes: readonly BusinessType[] =
   }));
 
 export const businessTypes: readonly BusinessType[] = [
+  {
+    label: advertisingAgency,
+    segment: "Serviços",
+    category: advertisingAgency,
+    serviceType: advertisingAgency,
+  },
   ...foodTypes,
   { label: "Comércio", segment: "Comércio", category: "Comércio" },
   subcategoryType("Estética e Beleza", "Estética e Beleza"),
@@ -76,14 +87,15 @@ export const businessTypes: readonly BusinessType[] = [
 ];
 
 export function businessType(
-  business: Pick<Business, "segment" | "subcategory" | "lodgingType">,
+  business: Pick<Business, "segment" | "subcategory" | "lodgingType" | "serviceType">,
 ): BusinessType {
   return (
     businessTypes.find(
       (type) =>
         type.segment === business.segment &&
         type.subcategory === (business.subcategory ?? undefined) &&
-        type.lodgingType === (business.lodgingType ?? undefined),
+        type.lodgingType === (business.lodgingType ?? undefined) &&
+        type.serviceType === (business.serviceType ?? undefined),
     ) ?? {
       label: business.segment,
       segment: business.segment,

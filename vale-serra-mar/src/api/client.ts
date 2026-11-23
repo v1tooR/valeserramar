@@ -9,8 +9,16 @@ export class ApiError extends Error {
     this.name = "ApiError";
   }
 }
-export const apiConfigured = Boolean(process.env.EXPO_PUBLIC_API_URL?.trim());
-const base = (process.env.EXPO_PUBLIC_API_URL || "").replace(/\/$/, "");
+const base = (process.env.EXPO_PUBLIC_API_URL || "").trim().replace(/\/+$/, "");
+const officialApi = /^https?:\/\/api\.valeserraemar\.com\.br(?:[/:]|$)/i;
+export const apiConfigured = Boolean(base);
+export const asaasSandboxEnabled =
+  apiConfigured &&
+  !officialApi.test(base) &&
+  process.env.EXPO_PUBLIC_ASAAS_SANDBOX === "1";
+const storagePrefix = asaasSandboxEnabled ? "vsm.asaas-sandbox." : "vsm.";
+const accessKey = storagePrefix + "access";
+const guestKey = storagePrefix + "guest";
 let accessToken = "";
 let guestToken = "";
 let onUnauthorized = () => {};
@@ -28,13 +36,13 @@ export function setUnauthorizedHandler(handler: () => void) {
   onUnauthorized = handler;
 }
 export async function restoreTokens() {
-  accessToken = (await vault.get("vsm.access")) || "";
-  guestToken = (await vault.get("vsm.guest")) || "";
+  accessToken = (await vault.get(accessKey)) || "";
+  guestToken = (await vault.get(guestKey)) || "";
   return Boolean(accessToken);
 }
 export async function setAccessToken(token: string) {
-  if (token) await vault.set("vsm.access", token);
-  else await vault.remove("vsm.access");
+  if (token) await vault.set(accessKey, token);
+  else await vault.remove(accessKey);
   accessToken = token;
 }
 export async function request<T>(
@@ -104,7 +112,7 @@ export async function ensureGuest() {
       });
       if (!result.token || typeof result.token !== "string")
         throw new ApiError("Resposta inválida do serviço.");
-      await vault.set("vsm.guest", result.token);
+      await vault.set(guestKey, result.token);
       guestToken = result.token;
     })().finally(() => {
       creatingGuest = null;

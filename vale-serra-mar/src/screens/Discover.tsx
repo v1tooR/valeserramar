@@ -5,22 +5,22 @@ import React, { useState } from "react";
 import {
   Image,
   ImageBackground,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
 import { assets, photoSource } from "../assets";
-import { regions, segments } from "../domain/catalog";
+import { regionForCity, regions, segments } from "../domain/catalog";
 import {
+  advertisingAgency,
   categoryForSelection,
   exploreCategories,
   foodTypes,
   lodgingTypes,
   type ExploreCategory,
 } from "../domain/categories";
-import { filterBusinesses } from "../domain/logic";
+import { filterBusinesses, highlightedBusinesses } from "../domain/logic";
 import type { Filters } from "../domain/models";
 import { useStore } from "../store";
 import { useNav, type ScreenProps } from "../navigation";
@@ -40,6 +40,7 @@ import {
   type IconName,
 } from "../components/ui";
 import { BusinessCard } from "../components/BusinessCard";
+import { HighlightCarousel } from "../components/HighlightCarousel";
 export const emptyFilters: Filters = {
   city: "",
   segment: "",
@@ -135,6 +136,11 @@ const categoryStyles: Record<
   ExploreCategory,
   { icon: IconName; color: string; accent: string }
 > = {
+  [advertisingAgency]: {
+    icon: "target",
+    color: "#FCE9EA",
+    accent: "#8A3547",
+  },
   Alimentação: {
     icon: "coffee",
     color: c.peach,
@@ -166,11 +172,12 @@ const categoryStyles: Record<
     accent: "#45556D",
   },
 };
-const categoryRows = [
-  exploreCategories.slice(0, 2),
-  exploreCategories.slice(2, 4),
-  exploreCategories.slice(4),
-];
+const categoryColumns = 2;
+const categoryRows = Array.from(
+  { length: Math.ceil(exploreCategories.length / categoryColumns) },
+  (_, row) =>
+    exploreCategories.slice(row * categoryColumns, (row + 1) * categoryColumns),
+);
 const homeCategories = [
   { label: "Alimentação", category: "Alimentação" },
   { label: "Hospedagem", category: "Hospedagem" },
@@ -239,6 +246,7 @@ export function HomeScreen() {
       Number(state.interests.includes(b.segment)) -
       Number(state.interests.includes(a.segment)),
   );
+  const highlights = highlightedBusinesses(state.businesses, "home");
   return (
     <Page brand tab="Home">
       <View>
@@ -281,21 +289,8 @@ export function HomeScreen() {
         onPress={() => nav.navigate("Search")}
       />
       <HomeCategories />
-      <Section
-        title={`Em destaque em ${state.city}`}
-        action="Ver todos"
-        onPress={() => nav.navigate("Results")}
-      />
-      <CollectionState empty={!sorted.length} />
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 12 }}
-      >
-        {sorted.map((b) => (
-          <BusinessCard key={b.id} business={b} compact />
-        ))}
-      </ScrollView>
+      <HighlightCarousel businesses={highlights} />
+      <CollectionState empty={!sorted.length && !highlights.length} />
       {sorted.length > 0 && <Section title="Na sua cidade" />}
       {sorted.slice(0, 3).map((b) => (
         <BusinessCard key={b.id} business={b} />
@@ -345,6 +340,7 @@ export function SearchScreen() {
           </Pressable>
         </View>
       </View>
+      <HighlightCarousel businesses={highlightedBusinesses(state.businesses, "explore")} />
       <View style={explore.section}>
         <Section title="Buscar por categoria" />
         <View style={explore.categoryGrid}>
@@ -370,6 +366,7 @@ export function SearchScreen() {
                   </Pressable>
                 );
               })}
+              {row.length < categoryColumns && <View style={explore.categorySpacer} />}
             </View>
           ))}
         </View>
@@ -402,7 +399,7 @@ export function SearchScreen() {
                 selected={state.city === city}
                 onPress={() => {
                   update((s) => ({ ...s, city, region: region.name }));
-                  nav.navigate("Results");
+                  nav.navigate("Results", { filters: { ...emptyFilters, city } });
                 }}
               />
             )),
@@ -445,6 +442,7 @@ const explore = StyleSheet.create({
     alignItems: "stretch",
     gap: 12,
   },
+  categorySpacer: { flex: 1 },
   categoryCard: {
     flex: 1,
     minWidth: 0,
@@ -525,11 +523,12 @@ export function ResultsScreen({ route }: ScreenProps) {
     route.params?.allRegions || false,
   );
   const category = categoryForSelection(filters.segment);
+  const region = regionForCity(filters.city) ?? state.region;
   const results = filterBusinesses(
     state.businesses,
     filters,
     query,
-    allRegions ? "" : state.region,
+    allRegions ? "" : region,
   );
   if (showFilters)
     return (
@@ -579,7 +578,7 @@ export function ResultsScreen({ route }: ScreenProps) {
       </View>
       <View style={s.wrap}>
         <Chip
-          title={allRegions ? "Todas as regiões" : state.region}
+          title={allRegions ? "Todas as regiões" : region}
           selected
           onPress={() => setAllRegions(!allRegions)}
         />
@@ -589,6 +588,9 @@ export function ResultsScreen({ route }: ScreenProps) {
           onPress={() => setFilters((f) => ({ ...f, openNow: !f.openNow }))}
         />
       </View>
+      {category && (
+        <HighlightCarousel businesses={highlightedBusinesses(results, "explore")} />
+      )}
       <Text style={s.label}>{results.length} lugares encontrados</Text>
       {results.map((b) => (
         <BusinessCard key={b.id} business={b} />

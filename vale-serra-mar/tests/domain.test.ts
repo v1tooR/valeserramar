@@ -1,4 +1,7 @@
 import { it, expect } from "@jest/globals";
+import { businessSchema } from "../src/api/schemas";
+import { advertisingAgency, businessTypes } from "../src/domain/categories";
+import { regionForCity } from "../src/domain/catalog";
 import {
   cartTotal,
   validateCart,
@@ -6,6 +9,7 @@ import {
   nights,
   validateReservation,
   filterBusinesses,
+  highlightedBusinesses,
   isOpen,
   orderMessage,
 } from "../src/domain/logic";
@@ -44,6 +48,28 @@ const filters: Filters = {
   menu: false,
   reservations: false,
 };
+it("mantém 15 banners por local e respeita a categoria selecionada", () => {
+  const photo = "https://api.example.test/media/banner";
+  const cafe = { ...businesses[1], photo, highlights: { home: null, explore: 1 } };
+  const local = Array.from({ length: 16 }, (_, index) => ({
+    ...businesses[0], id: "home-" + index, photo,
+    highlights: { home: 16 - index, explore: null },
+  }));
+  const all = [
+    ...local, cafe,
+    { ...cafe, id: "pendente", status: "Em análise" as const },
+    { ...cafe, id: "sem-capa", photo: "" },
+    ...businesses,
+  ];
+  expect(highlightedBusinesses(all, "home").map(b => b.id)).toEqual(
+    local.slice(1).reverse().map(b => b.id),
+  );
+  expect(highlightedBusinesses(all, "explore")).toEqual([cafe]);
+  const lodgings = filterBusinesses(all, { ...filters, segment: "Hospedagem" }, "", "");
+  expect(highlightedBusinesses(lodgings, "explore")).toEqual([]);
+  const dining = filterBusinesses(all, { ...filters, segment: "Alimentação" }, "", "");
+  expect(highlightedBusinesses(dining, "explore")).toEqual([cafe]);
+});
 it("soma quantidade e adicionais sem cobrar reserva", () =>
   expect(cartTotal([item])).toBeCloseTo(191.8));
 it("rejeita item removido, indisponível ou com preço alterado", () => {
@@ -104,6 +130,19 @@ it("busca ignora acentos e esconde anúncios não aprovados", () => {
     ),
   ).toEqual([]);
 });
+it("encontra estabelecimentos em Paraibuna e Monteiro Lobato", () => {
+  const valley = "Vale do Paraíba", mountain = "Serra da Mantiqueira";
+  const cities = [
+    { ...businesses[0], id: "paraibuna", city: "Paraibuna", region: valley },
+    { ...businesses[0], id: "monteiro", city: "Monteiro Lobato", region: mountain },
+  ];
+  for (const business of cities) {
+    const { city, region } = business;
+    expect(regionForCity(city)).toBe(region);
+    expect(filterBusinesses(cities, { ...filters, city }, "", region)).toEqual([business]);
+    expect(filterBusinesses(cities, filters, city, "")).toEqual([business]);
+  }
+});
 it("filtra categorias e separa subcategorias com o mesmo segmento", () => {
   const lodging = { ...businesses[0], segment: "Hospedagem" as const };
   const places = [
@@ -116,6 +155,14 @@ it("filtra categorias e separa subcategorias com o mesmo segmento", () => {
     { ...lodging, id: "hospedagem-antiga" },
     { ...businesses[0], id: "lazer", segment: "Lazer" as const },
     { ...businesses[0], id: "servico", segment: "Serviços" as const },
+    businessSchema.parse({
+      ...businesses[0],
+      id: "agencia",
+      photo: "",
+      gallery: [],
+      segment: "Serviços",
+      serviceType: advertisingAgency,
+    }),
     {
       ...businesses[0],
       id: "salao",
@@ -143,6 +190,12 @@ it("filtra categorias e separa subcategorias com o mesmo segmento", () => {
   expect(ids("Lazer")).toEqual(["lazer"]);
   expect(ids("Serviços")).toEqual(["servico"]);
   expect(ids("Estética e Beleza")).toEqual(["salao"]);
+  expect(ids(advertisingAgency)).toEqual(["agencia"]);
+  expect(filterBusinesses(places, filters, "agencia de publicidade", "").map(b => b.id))
+    .toEqual(["agencia"]);
+  expect(businessTypes.find(type => type.label === advertisingAgency)).toMatchObject({
+    segment: "Serviços", category: advertisingAgency, serviceType: advertisingAgency,
+  });
 });
 it("considera expediente atravessando meia-noite no fuso de São Paulo", () => {
   const b = {

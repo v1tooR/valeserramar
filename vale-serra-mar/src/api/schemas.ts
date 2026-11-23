@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  advertisingAgency,
   businessSubcategories,
   lodgingSubcategories,
 } from "../domain/categories";
@@ -33,6 +34,7 @@ export const businessSchema = z.object({
   ]),
   subcategory: z.enum(businessSubcategories).nullish(),
   lodgingType: z.enum(lodgingSubcategories).nullish(),
+  serviceType: z.literal(advertisingAgency).nullish(),
   region: z.string(),
   city: z.string(),
   district: z.string(),
@@ -63,6 +65,10 @@ export const businessSchema = z.object({
   ]),
   correction: z.string(),
   owner: z.boolean(),
+  highlights: z.object({
+    home: z.number().int().min(1).max(15).nullable(),
+    explore: z.number().int().min(1).max(15).nullable(),
+  }).optional(),
 });
 export const productSchema = z.object({
   id: z.string(),
