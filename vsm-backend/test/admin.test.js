@@ -11,7 +11,7 @@ import { createApp } from "../src/app.js";
 import { migrate } from "../src/db.js";
 import { hash, passwordHash } from "../src/security.js";
 
-test("Painel web: sessão, revisão com histórico, publicação e consultas de suporte", async () => {
+test("Painel web: sessão, revisão com histórico, publicação e consultas de suporte", async (t) => {
   const temp = await mkdtemp(join(tmpdir(), "vsm-admin-"));
   const probe = createServer();
   await new Promise((resolve, reject) => {
@@ -483,6 +483,100 @@ test("Painel web: sessão, revisão com histórico, publicação e consultas de 
     assert.equal(publishedAgency.serviceType, "Agência de Publicidade");
     assert.equal(publishedAgency.segment, "Serviços");
     assert.equal(publishedAgency.city, "Paraibuna");
+
+    await t.test("Editar, excluir e restaurar um anunciante preserva seus registros e controla o acesso ao app", async () => {
+      const accountPath = `/admin/anunciantes/${account.id}`;
+      const editPath = accountPath + "/editar";
+      const deletePath = accountPath + "/excluir";
+      const otherOwner = { ...owner, email: "outro@example.test" };
+      const otherLogin = await send("POST", "/auth/register", otherOwner);
+      assert.equal(otherLogin.statusCode, 201, otherLogin.body);
+      const otherClient = { authorization: "Bearer " + otherLogin.json().token };
+      const otherBusiness = await send("POST", "/businesses", { ...business, name: "Cafeteria de outra conta" }, otherClient);
+      assert.equal(otherBusiness.statusCode, 201, otherBusiness.body);
+      const otherId = otherBusiness.json().id;
+      assert.equal((await send("POST", `/businesses/${otherId}/submit`, {}, otherClient)).statusCode, 200);
+      assert.equal((await form(`/admin/estabelecimentos/${otherId}/revisar`, {
+        ...await reviewFields(otherId), action: "aprovar",
+      }, { cookie })).statusCode, 303);
+
+      const list = await get("/admin/anunciantes?q=dono", staffCookie);
+      assert.ok(list.body.includes(editPath));
+      assert.equal((await get(editPath, "")).headers.location, "/admin/entrar");
+      const editPage = await get(editPath, staffCookie);
+      assert.equal(editPage.statusCode, 200, editPage.body);
+      assert.match(editPage.body, /E-mail de acesso ao app/);
+      assert.ok(editPage.body.includes(`value="${owner.email}"`));
+      const updated = { name: "Anunciante <Novo>", email: email.toUpperCase(), phone: "(12) 99911-2233" };
+      const formFields = { csrf: signupCsrf, version: extract(editPage.body, "version"), ...updated };
+      assert.equal((await form(editPath, { ...formFields, csrf: "inválido" }, { cookie: staffCookie })).statusCode, 403);
+      assert.equal((await form(editPath, { ...formFields, email: "inválido" }, { cookie: staffCookie })).statusCode, 422);
+      const duplicate = await form(editPath, { ...formFields, email: otherOwner.email }, { cookie: staffCookie });
+      assert.equal(duplicate.statusCode, 409, duplicate.body);
+      assert.match(duplicate.body, /Esse e-mail já pertence a outro anunciante/);
+      const saved = await form(editPath, formFields, { cookie: staffCookie });
+      assert.equal(saved.statusCode, 303, saved.body);
+      const detail = await get(saved.headers.location, staffCookie);
+      assert.match(detail.body, /Anunciante &lt;Novo&gt;/);
+      assert.match(detail.body, /Dados do anunciante editados/);
+      assert.equal((await form(editPath, formFields, { cookie: staffCookie })).statusCode, 409);
+      assert.equal((await send("GET", "/me", undefined, client)).statusCode, 401);
+      assert.equal((await send("POST", "/auth/login", { email: owner.email, password: owner.password })).statusCode, 401);
+      const signIn = () => send("POST", "/auth/login", { email, password: owner.password });
+      const newLogin = await signIn();
+      assert.equal(newLogin.statusCode, 200, newLogin.body);
+      assert.deepEqual(newLogin.json().profile, { ...updated, email });
+      const newClient = { authorization: "Bearer " + newLogin.json().token };
+
+      assert.equal((await publishHighlight(createdId, "home", true)).statusCode, 303);
+      const confirmation = await get(deletePath, staffCookie);
+      assert.match(confirmation.body, /Mover para a lixeira/);
+      assert.ok((await app.inject("/catalog")).json().businesses.some(b => b.id === createdId));
+      const remove = () => form(deletePath, {
+        csrf: signupCsrf, version: extract(confirmation.body, "version"),
+      }, { cookie: staffCookie });
+      const removals = await Promise.all([remove(), remove()]);
+      assert.deepEqual(removals.map(response => response.statusCode).sort(), [303, 409]);
+      assert.doesNotMatch((await get("/admin/anunciantes", staffCookie)).body, /Anunciante &lt;Novo&gt;/);
+      assert.match((await get("/admin/anunciantes/lixeira?q=Novo", staffCookie)).body, /Anunciante &lt;Novo&gt;/);
+      assert.equal((await get(editPath, staffCookie)).statusCode, 409);
+      assert.equal((await get("/admin", cookie)).statusCode, 200);
+      assert.equal((await signIn()).statusCode, 401);
+      assert.equal((await send("GET", "/me/workspace", undefined, newClient)).statusCode, 401);
+      assert.deepEqual((await app.inject("/catalog")).json().businesses.map(b => b.id), [otherId]);
+      assert.deepEqual((await app.inject("/catalog")).json().products, []);
+      assert.match((await get(createdPath, staffCookie)).body, /anunciante está na lixeira/);
+      assert.equal((await publishHighlight(createdId, "home", true)).statusCode, 409);
+      assert.equal((await form(page + "/revisar", {
+        ...await reviewFields(id), action: "aprovar",
+      }, { cookie })).statusCode, 409);
+      const disabledSignup = await get(signup + "?owner=" + account.id, staffCookie);
+      const archivedRegistration = await registerFromPanel(await multipartSignup({
+        key: extract(disabledSignup.body, "key"), ownerEmail: email,
+      }, null, false));
+      assert.equal(archivedRegistration.statusCode, 422);
+      assert.match(archivedRegistration.body, /conta de anunciante ativa/);
+      assert.equal((await send("POST", "/reservations", newReservation, { "x-guest-token": visitor })).statusCode, 422);
+      assert.match((await get(`/admin/reservas/${booked.json().id}`, staffCookie)).body, /Visitante de teste/);
+      const remaining = await send("GET", "/reservations", undefined, { "x-guest-token": visitor });
+      assert.ok(remaining.json().some(reservation => reservation.id === booked.json().id));
+
+      const archived = await get(accountPath, staffCookie);
+      assert.match(archived.body, /Restaurar anunciante/);
+      const restored = await form(accountPath + "/restaurar", {
+        csrf: signupCsrf, version: extract(archived.body, "version"),
+      }, { cookie: staffCookie });
+      assert.equal(restored.statusCode, 303, restored.body);
+      assert.match((await get(restored.headers.location, staffCookie)).body, /Anunciante restaurado/);
+      assert.equal((await send("GET", "/me", undefined, newClient)).statusCode, 401);
+      assert.equal((await signIn()).statusCode, 200);
+      const restoredCatalog = (await app.inject("/catalog")).json();
+      assert.equal(restoredCatalog.businesses.find(b => b.id === createdId).highlights, undefined);
+      assert.ok(restoredCatalog.businesses.some(b => b.id === agencyId));
+      assert.ok(restoredCatalog.businesses.some(b => b.id === otherId));
+      assert.ok(!restoredCatalog.businesses.some(b => b.id === id));
+      assert.ok(restoredCatalog.products.some(p => p.id === product.json().id));
+    });
 
     await writeFile(accountsFile, "[]");
     await app.close();

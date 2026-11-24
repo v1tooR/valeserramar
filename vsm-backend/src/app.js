@@ -24,7 +24,6 @@ import {
 const limit = (max) => ({
   config: { rateLimit: { max, timeWindow: "1 minute" } },
 });
-const accountProfile = ({ name, email, phone }) => ({ name, email, phone });
 const publicProfile = "name,email,phone";
 
 export async function createApp({
@@ -99,15 +98,18 @@ export async function createApp({
   });
   app.post("/auth/login", limit(8), async (req) => {
     const { email, password } = parse(credentials, req.body);
-    const account = await row(db, "SELECT * FROM vsm.accounts WHERE email=$1", [
-      email,
-    ]);
+    const account = await row(db,
+      "SELECT id,password_hash FROM vsm.accounts WHERE email=$1 AND deleted_at IS NULL", [email]);
     const valid = await checkPassword(password, account?.password_hash);
     if (!account || !valid) fail(401, "E-mail ou senha inválidos.");
-    return {
-      profile: accountProfile(account),
-      token: await issueSession(db, account.id),
-    };
+    return transaction(db, async (client) => {
+      const current = await row(client,
+        `SELECT ${publicProfile} FROM vsm.accounts
+         WHERE id=$1 AND email=$2 AND password_hash=$3 AND deleted_at IS NULL FOR SHARE`,
+        [account.id, email, account.password_hash]);
+      if (!current) fail(401, "E-mail ou senha inválidos.");
+      return { profile: current, token: await issueSession(client, account.id) };
+    });
   });
   app.post("/auth/logout", async (req, reply) => {
     const { digest } = await session(db, req);
@@ -119,21 +121,26 @@ export async function createApp({
   );
   app.get("/me", async (req) => {
     const { accountId } = await session(db, req);
-    return row(
+    const profile = await row(
       db,
-      "SELECT " + publicProfile + " FROM vsm.accounts WHERE id=$1",
+      "SELECT " + publicProfile + " FROM vsm.accounts WHERE id=$1 AND deleted_at IS NULL",
       [accountId],
     );
+    if (!profile) fail(401, "Sessão inválida ou expirada.");
+    return profile;
   });
   app.patch("/me", async (req) => {
-    const { accountId } = await session(db, req);
-    const { name, email, phone } = parse(profileInput, req.body);
-    return row(
-      db,
-      "UPDATE vsm.accounts SET name=$2,email=$3,phone=$4 WHERE id=$1 RETURNING " +
-        publicProfile,
-      [accountId, name, email, phone],
-    );
+    return transaction(db, async (client) => {
+      const { accountId, digest } = await session(client, req);
+      const { name, email, phone } = parse(profileInput, req.body);
+      await client.query("SELECT id FROM vsm.accounts WHERE id=$1 FOR NO KEY UPDATE", [accountId]);
+      const profile = await row(client, `UPDATE vsm.accounts SET name=$2,email=$3,phone=$4
+        WHERE id=$1 AND deleted_at IS NULL AND EXISTS (
+          SELECT 1 FROM vsm.sessions WHERE token_hash=$5 AND expires_at>now()
+        ) RETURNING ${publicProfile}`, [accountId, name, email, phone, digest]);
+      if (!profile) fail(401, "Sessão inválida ou expirada.");
+      return profile;
+    });
   });
   app.post("/media", limit(30), async (req, reply) => {
     const { accountId } = await session(db, req);

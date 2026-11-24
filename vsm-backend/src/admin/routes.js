@@ -5,7 +5,9 @@ import { join } from "node:path";
 import { requireId, uuid } from "../catalog.js";
 import { row } from "../db.js";
 import { reviewBusiness, reviewStates, setBusinessInTrash } from "../moderation.js";
+import { profileInput } from "../schemas.js";
 import { checkPassword, fail, hash } from "../security.js";
+import { editAdvertiser, setAdvertiserInTrash } from "./advertisers.js";
 import * as data from "./data.js";
 import { createBusiness, editBusiness, registrationPhotos, weekdays } from "./registration.js";
 import * as view from "./views.js";
@@ -164,7 +166,7 @@ export async function adminRoutes(app, { db, origin, mediaDir, admin }) {
     panel.get("/estabelecimentos/novo", async (request, reply) => {
       const owner = request.query.owner;
       const account = typeof owner === "string" && uuid.test(owner) &&
-        await row(db, "SELECT email FROM vsm.accounts WHERE id=$1", [owner]);
+        await row(db, "SELECT email FROM vsm.accounts WHERE id=$1 AND deleted_at IS NULL", [owner]);
       return html(reply, view.registrationPage(request.adminSession, {
         ownerEmail: account?.email, key: randomUUID(),
       }));
@@ -275,6 +277,56 @@ export async function adminRoutes(app, { db, origin, mediaDir, admin }) {
     });
     panel.get("/anunciantes", async (request, reply) =>
       html(reply, view.accountList(await data.accounts(db, request.query), request.adminSession)));
+    panel.get("/anunciantes/lixeira", async (request, reply) =>
+      html(reply, view.accountList(await data.accounts(db, request.query, true), request.adminSession,
+        request.query.excluido === "1")));
+    panel.get("/anunciantes/:id", async (request, reply) => {
+      const account = await data.advertiserRecord(db, requireId(request.params.id));
+      const history = await data.advertiserHistory(db, account.id);
+      return html(reply, view.advertiserPage(account, history, request.adminSession, request.query));
+    });
+    async function activeAdvertiser(id) {
+      const account = await data.advertiserRecord(db, id);
+      if (account.deleted_at) fail(409, "Restaure o anunciante da lixeira para fazer alterações.");
+      return account;
+    }
+    panel.get("/anunciantes/:id/editar", async (request, reply) => {
+      const account = await activeAdvertiser(requireId(request.params.id));
+      return html(reply, view.advertiserForm(account, request.adminSession));
+    });
+    panel.post("/anunciantes/:id/editar", { bodyLimit: formLimit }, async (request, reply) => {
+      const id = requireId(request.params.id);
+      const values = request.body ?? {};
+      const profile = profileInput.safeParse(values);
+      if (!profile.success) {
+        const account = await activeAdvertiser(id);
+        return html(reply.code(422), view.advertiserForm(account, request.adminSession, values,
+          "Confira o nome, o e-mail e o telefone."));
+      }
+      try {
+        await editAdvertiser(db, { id, version: values.version, profile: profile.data, reviewer: request.adminSession.email });
+      } catch (error) {
+        if (error.code !== "23505" || error.constraint !== "accounts_email_key") throw error;
+        const account = await activeAdvertiser(id);
+        return html(reply.code(409), view.advertiserForm(account, request.adminSession, values,
+          "Esse e-mail já pertence a outro anunciante."));
+      }
+      return reply.redirect(`/admin/anunciantes/${id}?editado=1`, 303);
+    });
+    panel.get("/anunciantes/:id/excluir", async (request, reply) => {
+      const account = await activeAdvertiser(requireId(request.params.id));
+      return html(reply, view.deleteAdvertiserPage(account, request.adminSession));
+    });
+    async function changeAdvertiserTrash(request, reply, removing) {
+      const id = requireId(request.params.id);
+      await setAdvertiserInTrash(db, {
+        id, version: request.body?.version, removing, reviewer: request.adminSession.email,
+      });
+      return reply.redirect(removing ? "/admin/anunciantes/lixeira?excluido=1" :
+        `/admin/anunciantes/${id}?restaurado=1`, 303);
+    }
+    panel.post("/anunciantes/:id/excluir", (request, reply) => changeAdvertiserTrash(request, reply, true));
+    panel.post("/anunciantes/:id/restaurar", (request, reply) => changeAdvertiserTrash(request, reply, false));
     panel.get("/reservas", async (request, reply) =>
       html(reply, view.bookingList(await data.bookings(db, request.query), request.adminSession)));
     panel.get("/reservas/:id", async (request, reply) => {

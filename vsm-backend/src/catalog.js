@@ -34,8 +34,9 @@ const productView = (record) => ({
 export async function owned(db, id, accountId, lock = false) {
   const business = await row(
     db,
-    "SELECT * FROM vsm.businesses WHERE id=$1 AND owner_id=$2 AND deleted_at IS NULL" +
-      (lock ? " FOR UPDATE" : ""),
+    `SELECT b.* FROM vsm.businesses b JOIN vsm.accounts a ON a.id=b.owner_id
+     WHERE b.id=$1 AND b.owner_id=$2 AND b.deleted_at IS NULL AND a.deleted_at IS NULL` +
+      (lock ? " FOR UPDATE OF b" : ""),
     [requireId(id), accountId],
   );
   if (!business) fail(404, "Estabelecimento não encontrado.");
@@ -107,11 +108,13 @@ export function catalogRoutes(app, db, origin) {
   app.get("/catalog", async () => {
     const businesses = await rows(
       db,
-      "SELECT * FROM vsm.businesses WHERE status='Aprovado' AND deleted_at IS NULL ORDER BY id",
+      `SELECT b.* FROM vsm.businesses b JOIN vsm.accounts a ON a.id=b.owner_id
+       WHERE b.status='Aprovado' AND b.deleted_at IS NULL AND a.deleted_at IS NULL ORDER BY b.id`,
     );
     const products = await rows(
       db,
-      "SELECT p.* FROM vsm.products p JOIN vsm.businesses b ON b.id=p.business_id WHERE b.status='Aprovado' AND b.deleted_at IS NULL AND p.data->>'available'='true' ORDER BY p.id",
+      "SELECT * FROM vsm.products WHERE business_id=ANY($1::uuid[]) AND data->>'available'='true' ORDER BY id",
+      [businesses.map(({ id }) => id)],
     );
     return {
       businesses: businesses.map((b) => businessView(b, false)),
@@ -178,6 +181,8 @@ export function catalogRoutes(app, db, origin) {
       accountId + ":business",
       data,
       async (client) => {
+        const owner = await row(client, "SELECT id FROM vsm.accounts WHERE id=$1 AND deleted_at IS NULL FOR SHARE", [accountId]);
+        if (!owner) fail(401, "Sessão inválida ou expirada.");
         checkGalleryLimit(data.gallery);
         await checkImages(client, images, accountId, origin);
         return businessView(

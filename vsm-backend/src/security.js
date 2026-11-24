@@ -52,7 +52,9 @@ export async function session(db, request, guest = false) {
   const digest = hash(token);
   const result = await row(
     db,
-    "SELECT account_id FROM vsm.sessions WHERE token_hash=$1 AND expires_at>now()",
+    `SELECT s.account_id FROM vsm.sessions s
+     LEFT JOIN vsm.accounts a ON a.id=s.account_id
+     WHERE s.token_hash=$1 AND s.expires_at>now() AND a.deleted_at IS NULL`,
     [digest],
   );
   if (!result || guest !== (result.account_id === null))

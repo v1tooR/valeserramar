@@ -40,7 +40,10 @@ export function bookingRoutes(app, db) {
       digest + ":booking",
       data,
       async (client) => {
-        const b = await row(
+        const owner = await row(client, `SELECT a.id FROM vsm.accounts a
+          JOIN vsm.businesses b ON b.owner_id=a.id WHERE b.id=$1 AND a.deleted_at IS NULL FOR SHARE OF a`,
+          [data.businessId]);
+        const b = owner && await row(
           client,
           "SELECT data FROM vsm.businesses WHERE id=$1 AND status='Aprovado' AND deleted_at IS NULL FOR SHARE",
           [data.businessId],

@@ -8,13 +8,14 @@ export const businessStatuses = businessSchema.shape.status.options;
 export const bookingStatuses = reservationSchema.shape.status.options;
 const pageSize = 16;
 export const highlightLimit = 15;
+export const highlightLock = 55738402;
 export const highlightPlacements = {
   home: { label: "Início", column: "home_highlight" },
   explore: { label: "Explorar e categorias", column: "explore_highlight" },
 };
 
 export function canHighlight(business) {
-  return business.status === "Aprovado" && !business.deleted_at &&
+  return business.status === "Aprovado" && !business.deleted_at && !business.owner_deleted_at &&
     typeof business.data?.photo === "string" && Boolean(business.data.photo.trim());
 }
 
@@ -54,11 +55,14 @@ export async function overview(db) {
     row(db, `SELECT
       count(*) FILTER (WHERE status='Em análise')::int AS pending,
       count(*) FILTER (WHERE status='Aprovado')::int AS published,
-      (SELECT count(*)::int FROM vsm.accounts) AS accounts,
+      (SELECT count(*)::int FROM vsm.accounts WHERE deleted_at IS NULL) AS accounts,
       (SELECT count(*)::int FROM vsm.bookings WHERE data->>'status'='Pendente') AS bookings
-      FROM vsm.businesses WHERE deleted_at IS NULL`),
+      FROM vsm.businesses b JOIN vsm.accounts a ON a.id=b.owner_id
+      WHERE b.deleted_at IS NULL AND a.deleted_at IS NULL`),
     rows(db, `SELECT ${businessSummary} FROM vsm.businesses b
-      WHERE b.status='Em análise' AND b.deleted_at IS NULL ORDER BY name,b.id LIMIT 5`),
+      JOIN vsm.accounts a ON a.id=b.owner_id
+      WHERE b.status='Em análise' AND b.deleted_at IS NULL AND a.deleted_at IS NULL
+      ORDER BY name,b.id LIMIT 5`),
     rows(db, `${activityQuery} ORDER BY r.id DESC LIMIT 5`),
   ]);
   return { counts, queue, activity };
@@ -71,7 +75,7 @@ export async function businesses(db, params, deleted = false) {
   const owner = filterId(params.owner);
   const result = await paginate(
     db,
-    `SELECT ${businessSummary}, a.name AS owner_name FROM vsm.businesses b
+    `SELECT ${businessSummary}, a.deleted_at AS owner_deleted_at FROM vsm.businesses b
      JOIN vsm.accounts a ON a.id=b.owner_id
      WHERE ($1='' OR strpos(lower(concat_ws(' ', b.data->>'name', b.data->>'city',
            b.data->>'region', a.name, a.email)), lower($1))>0)
@@ -91,7 +95,7 @@ export async function businessRecord(db, id) {
   return row(db, `SELECT b.id,b.owner_id,b.status,b.correction,b.deleted_at,b.data,
       b.home_highlight,b.explore_highlight,
       b.xmin::text AS version, a.name AS owner_name, a.email AS owner_email,
-      a.phone AS owner_phone
+      a.phone AS owner_phone, a.deleted_at AS owner_deleted_at
     FROM vsm.businesses b JOIN vsm.accounts a ON a.id=b.owner_id WHERE b.id=$1`, [id]);
 }
 
@@ -116,15 +120,18 @@ export async function businessDetails(db, id) {
 export async function setBusinessHighlight(db, id, placement, enabled) {
   const { column, label } = highlightPlacements[placement];
   await transaction(db, async (client) => {
-    await client.query("SELECT pg_advisory_xact_lock(55738402)");
-    const business = await row(client,
-      "SELECT * FROM vsm.businesses WHERE id=$1 AND deleted_at IS NULL FOR UPDATE", [id]);
+    await client.query("SELECT pg_advisory_xact_lock($1)", [highlightLock]);
+    const business = await row(client, `SELECT b.*, a.deleted_at AS owner_deleted_at
+      FROM vsm.businesses b JOIN vsm.accounts a ON a.id=b.owner_id
+      WHERE b.id=$1 AND b.deleted_at IS NULL FOR UPDATE OF b`, [id]);
     if (!business) fail(404, "Estabelecimento não encontrado.");
     if (Boolean(business[column]) === enabled) return;
     if (!enabled) {
       await client.query(`UPDATE vsm.businesses SET ${column}=NULL WHERE id=$1`, [id]);
       return;
     }
+    if (business.owner_deleted_at)
+      fail(409, "Restaure o anunciante antes de publicar um destaque.");
     if (!canHighlight(business))
       fail(409, "Para publicar o destaque, o estabelecimento precisa estar aprovado e ter uma foto de capa.");
     const updated = await row(client, `
@@ -140,17 +147,31 @@ export async function setBusinessHighlight(db, id, placement, enabled) {
   });
 }
 
-export async function accounts(db, params) {
+const accountSummary = `a.id,a.name,a.email,a.phone,a.deleted_at,
+  (SELECT count(*)::int FROM vsm.businesses b WHERE b.owner_id=a.id AND b.deleted_at IS NULL) AS businesses`;
+
+export async function accounts(db, params, deleted = false) {
   const q = filterText(params.q);
   const result = await paginate(
     db,
-    `SELECT a.id,a.name,a.email,a.phone,
-       (SELECT count(*)::int FROM vsm.businesses b WHERE b.owner_id=a.id AND b.deleted_at IS NULL) AS businesses
-     FROM vsm.accounts a
-     WHERE $1='' OR strpos(lower(concat_ws(' ',a.name,a.email,a.phone)),lower($1))>0`,
-    [q], "name,id", params.page,
+    `SELECT ${accountSummary} FROM vsm.accounts a
+     WHERE (a.deleted_at IS NOT NULL) = $2::boolean
+       AND ($1='' OR strpos(lower(concat_ws(' ',a.name,a.email,a.phone)),lower($1))>0)`,
+    [q, deleted], "a.deleted_at DESC NULLS LAST,a.name,a.id", params.page,
   );
-  return { ...result, filters: { q } };
+  return { ...result, deleted, filters: { q } };
+}
+
+export async function advertiserRecord(db, id) {
+  const account = await row(db, `SELECT ${accountSummary}, a.xmin::text AS version
+    FROM vsm.accounts a WHERE a.id=$1`, [id]);
+  if (!account) fail(404, "Anunciante não encontrado.");
+  return account;
+}
+
+export async function advertiserHistory(db, id) {
+  return rows(db, `SELECT reviewer, action, created_at FROM vsm.admin_advertiser_events
+    WHERE account_id=$1 ORDER BY id DESC LIMIT 12`, [id]);
 }
 
 export async function bookings(db, params) {

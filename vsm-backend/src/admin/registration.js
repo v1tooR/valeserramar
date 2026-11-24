@@ -200,8 +200,8 @@ export async function createBusiness(db, submission) {
   const business = { ...newBusinessDefaults, ...businessData(values) };
   requireComplete(business);
   return saveSubmission(db, submission, "admin-business", { ownerEmail: ownerEmail.data, business }, async (client, saveImages) => {
-    const owner = await row(client, "SELECT id FROM vsm.accounts WHERE email=$1 FOR KEY SHARE", [ownerEmail.data]);
-    if (!owner) fail(422, "Use o e-mail de uma conta de anunciante cadastrada no app.");
+    const owner = await row(client, "SELECT id FROM vsm.accounts WHERE email=$1 AND deleted_at IS NULL FOR SHARE", [ownerEmail.data]);
+    if (!owner) fail(422, "Use o e-mail de uma conta de anunciante ativa no app.");
     const record = { ...business, gallery: [] };
     await saveImages(owner.id, record);
     const created = await row(client, `INSERT INTO vsm.businesses(id,owner_id,status,data)

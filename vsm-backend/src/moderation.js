@@ -28,7 +28,8 @@ export async function reviewBusiness(db, { id, action, reason, reviewer, version
   return transaction(db, async (client) => {
     const current = await row(
       client,
-      "SELECT status, data, deleted_at, xmin::text AS version FROM vsm.businesses WHERE id=$1 FOR UPDATE",
+      `SELECT b.status,b.data,b.deleted_at,b.xmin::text AS version,a.deleted_at AS owner_deleted_at
+       FROM vsm.businesses b JOIN vsm.accounts a ON a.id=b.owner_id WHERE b.id=$1 FOR UPDATE OF b`,
       [id],
     );
     if (
@@ -37,6 +38,9 @@ export async function reviewBusiness(db, { id, action, reason, reviewer, version
       !canReview(action, current.status)
     )
       return null;
+
+    if (action === "aprovar" && current.owner_deleted_at)
+      fail(409, "Restaure o anunciante antes de publicar o estabelecimento.");
 
     if (action === "aprovar" && !["name", "address", "city", "description", "phone"].every(field =>
       typeof current.data[field] === "string" && current.data[field].trim()))

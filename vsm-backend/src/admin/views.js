@@ -8,11 +8,13 @@ const panel = "/admin";
 const stores = panel + "/estabelecimentos";
 const newStore = stores + "/novo";
 const trash = stores + "/lixeira";
+const advertisers = panel + "/anunciantes";
+const advertiserTrash = advertisers + "/lixeira";
 const bookings = panel + "/reservas";
 const menu = [
   ["overview", panel, "Visão geral"],
   ["businesses", stores, "Estabelecimentos"],
-  ["accounts", panel + "/anunciantes", "Anunciantes"],
+  ["accounts", advertisers, "Anunciantes"],
   ["bookings", bookings, "Reservas"],
   ["subscriptions", panel + "/assinaturas", "Assinaturas"],
   ["activity", panel + "/atividade", "Atividade"],
@@ -186,7 +188,7 @@ function businessTable(records, origin, empty) {
   return table(["Estabelecimento", "Localização", "Status", "Ação"], records.map((b) =>
     `<tr><td>${businessCell(b, origin)}</td>
       <td>${display(b.city)}<div class="muted">${display(b.region)}</div></td>
-      <td>${businessBadge(b)}</td>
+      <td>${businessBadge(b)}${b.owner_deleted_at ? `<div>${badge("Anunciante na lixeira")}</div>` : ""}</td>
       <td><div class="actions"><a class="button small" href="${stores}/${b.id}" aria-label="Abrir ${e(b.name || "cadastro")}">${b.status === "Em análise" ? "Revisar" : "Ver detalhes"}</a>
         ${b.deleted_at ? "" : `<a class="button small" href="${stores}/${b.id}/editar">Editar</a>`}</div></td></tr>`,
   ), empty, "Estabelecimentos");
@@ -208,7 +210,7 @@ export function overviewPage({ counts, queue, activity }, session, origin) {
   const cards = [
     ["review", "Em análise", counts.pending, href(stores, { status: "Em análise" })],
     ["businesses", "Publicados", counts.published, href(stores, { status: "Aprovado" })],
-    ["accounts", "Anunciantes", counts.accounts, panel + "/anunciantes"],
+    ["accounts", "Anunciantes", counts.accounts, advertisers],
     ["bookings", "Reservas pendentes", counts.bookings, href(bookings, { status: "Pendente" })],
   ].map(([kind, label, count, url]) => `<a class="metric" href="${url}">
     <span class="metric-icon metric-${kind}">${icon(kind)}</span>
@@ -444,6 +446,7 @@ export function businessPage({ business: b, products, activity, subscription, bo
     <div class="detail-top">${businessBadge(b)}<span class="muted">${display(data.city)} · ${display(data.region)}</span>
       ${b.deleted_at ? `<span class="muted">Excluído em ${e(timestamp.format(new Date(b.deleted_at)))}</span>` : ""}</div>
     ${notice ? `<p class="alert success" role="status">${notice}</p>` : ""}
+    ${b.owner_deleted_at ? `<p class="alert">O anunciante está na lixeira. Este estabelecimento está oculto no catálogo.</p>` : ""}
     <div class="detail-grid">
       <div class="stack">
         <section class="card padded">
@@ -465,8 +468,9 @@ export function businessPage({ business: b, products, activity, subscription, bo
             <ul class="plain-list">${rooms.map((room) => `<li><strong>${e(room.name)}</strong> · ${formatMoney(room.price)} · ${e(room.guests)} hóspedes</li>`).join("")}</ul></details>` : ""}
         </section>
         <section class="card padded">
-          <div class="section-head inner"><h2>Anunciante</h2><a class="text-link" href="${href(stores, { owner: b.owner_id })}">Outros anúncios</a></div>
+          <div class="section-head inner"><h2>Anunciante</h2><a class="text-link" href="${advertisers}/${b.owner_id}">Ver anunciante</a></div>
           ${details([["Nome", b.owner_name], ["E-mail", b.owner_email], ["Telefone", b.owner_phone]], "contact-fields")}
+          <a class="text-link" href="${href(stores, { owner: b.owner_id })}">Outros anúncios</a>
         </section>
         <section class="card"><header class="section-head"><h2>Produtos cadastrados</h2></header>
           ${table(["Produto", "Categoria", "Preço", "Disponibilidade"], products.map((p) =>
@@ -485,11 +489,11 @@ export function businessPage({ business: b, products, activity, subscription, bo
           <div class="actions"><a class="button primary" href="${stores}/${b.id}/editar">Editar</a>
             <a class="button danger" href="${stores}/${b.id}/excluir">Excluir</a></div>
         </section>
-        ${highlightSettings(b, highlights, session)}
+        ${b.owner_deleted_at ? "" : highlightSettings(b, highlights, session)}
         <section class="card padded">
           <h2>Revisão</h2>
           ${b.correction ? `<div class="alert"><strong>Motivo registrado</strong><p>${e(b.correction)}</p></div>` : ""}
-          ${pending ? `<p class="muted">A aprovação publica este estabelecimento no catálogo do app.</p>
+          ${pending && !b.owner_deleted_at ? `<p class="muted">A aprovação publica este estabelecimento no catálogo do app.</p>
             ${reviewForm(b, session, "aprovar", "Aprovar e publicar", "", false, "primary")}
             <details class="disclosure"><summary>Solicitar correções</summary>
               ${reviewForm(b, session, "corrigir", "Enviar correções", "O que precisa ser ajustado?", true)}</details>
@@ -513,18 +517,103 @@ export function businessPage({ business: b, products, activity, subscription, bo
     </div>`, `<a class="back-link" href="${b.deleted_at ? trash : stores}">${b.deleted_at ? "Voltar à lixeira" : "Voltar aos estabelecimentos"}</a>`);
 }
 
-export function accountList(result, session) {
-  const path = panel + "/anunciantes";
-  return layout("Anunciantes", "accounts", session, `<section class="card">
-    ${filters(path, result.filters, "Nome, e-mail ou telefone")}
-    ${table(["Anunciante", "Telefone", "Anúncios", "Ação"], result.records.map((a) =>
-      `<tr><td><strong>${display(a.name)}</strong><div class="muted">${display(a.email)}</div></td>
-        <td>${display(a.phone)}</td><td>${a.businesses}</td>
-        <td><div class="actions"><a class="button small" href="${href(stores, { owner: a.id })}">Ver anúncios</a>
-          <a class="button small" href="${href(newStore, { owner: a.id })}">Cadastrar estabelecimento</a></div></td></tr>`),
-    "Nenhum anunciante encontrado.", "Anunciantes")}
-    ${pagination(result, path)}
-  </section>`);
+export function accountList(result, session, removed = false) {
+  const path = result.deleted ? advertiserTrash : advertisers;
+  return layout(result.deleted ? "Lixeira de anunciantes" : "Anunciantes", "accounts", session, `
+    <div class="list-actions"><a class="button" href="${result.deleted ? advertisers : advertiserTrash}">${result.deleted ? "Ver anunciantes" : "Lixeira"}</a></div>
+    ${removed ? '<p class="alert success" role="status">Anunciante movido para a lixeira.</p>' : ""}
+    <section class="card">
+      ${filters(path, result.filters, "Nome, e-mail ou telefone")}
+      ${table(["Anunciante", "Telefone", "Anúncios", "Ações"], result.records.map((a) =>
+        `<tr><td><a class="entity-name" href="${advertisers}/${a.id}">${display(a.name)}</a><div class="muted">${display(a.email)}</div></td>
+          <td>${display(a.phone)}</td><td>${numbers.format(a.businesses)}</td>
+          <td><div class="actions">
+            <a class="button small" href="${href(stores, { owner: a.id })}">Ver anúncios</a>
+            ${a.deleted_at ? `<a class="button small" href="${advertisers}/${a.id}">Ver e restaurar</a>` : `
+              <a class="button small" href="${href(newStore, { owner: a.id })}">Cadastrar estabelecimento</a>
+              <a class="button small" href="${advertisers}/${a.id}/editar" aria-label="Editar ${e(a.name)}">Editar</a>`}
+          </div></td></tr>`),
+      result.deleted ? "Nenhum anunciante na lixeira." : "Nenhum anunciante encontrado.", "Anunciantes")}
+      ${pagination(result, path)}
+    </section>`);
+}
+
+const advertiserEvents = {
+  editado: "Dados do anunciante editados",
+  excluido: "Anunciante movido para a lixeira",
+  restaurado: "Anunciante restaurado",
+};
+
+function advertiserTrashForm(account, session, removing) {
+  const path = `${advertisers}/${account.id}`;
+  return `<form class="actions" method="post" action="${path}/${removing ? "excluir" : "restaurar"}">
+    ${csrf(session)}<input type="hidden" name="version" value="${e(account.version)}">
+    <button class="button ${removing ? "danger" : "primary"}" type="submit">${removing ? "Mover para a lixeira" : "Restaurar anunciante"}</button>
+    ${removing ? `<a class="button plain" href="${path}">Cancelar</a>` : ""}
+  </form>`;
+}
+
+export function advertiserPage(account, history, session, query) {
+  const path = `${advertisers}/${account.id}`;
+  const notice = account.deleted_at ? "" : query.restaurado === "1" ? "Anunciante restaurado." :
+    query.editado === "1" ? "Alterações salvas." : "";
+  return layout(account.name || "Anunciante", "accounts", session, `
+    ${notice ? `<p class="alert success" role="status">${notice}</p>` : ""}
+    <div class="detail-grid">
+      <div class="stack">
+        <section class="card padded">
+          <div class="detail-top">${badge(account.deleted_at ? "Na lixeira" : "Ativa")}</div>
+          <h2>Dados da conta</h2>
+          ${details([["E-mail", account.email], ["Telefone", account.phone], ["Estabelecimentos vinculados", numbers.format(account.businesses)]])}
+          <div class="actions">
+            <a class="button" href="${href(stores, { owner: account.id })}">Ver anúncios</a>
+            ${account.deleted_at ? "" : `<a class="button" href="${href(newStore, { owner: account.id })}">Cadastrar estabelecimento</a>`}
+          </div>
+        </section>
+        <section class="card"><header class="section-head"><h2>Histórico do anunciante</h2></header>
+          ${history.length ? `<ol class="event-list">${history.map((event) => `<li>
+            <span class="event-mark" aria-hidden="true"></span>
+            <div><strong>${e(advertiserEvents[event.action])}</strong>
+              <div class="muted">${e(event.reviewer)} · ${e(timestamp.format(new Date(event.created_at)))}</div>
+            </div></li>`).join("")}</ol>` : '<p class="empty">Nenhuma alteração registrada no painel.</p>'}
+        </section>
+      </div>
+      <div class="stack">
+        <section class="card padded">
+          <h2>${account.deleted_at ? "Restaurar conta" : "Gerenciar anunciante"}</h2>
+          ${account.deleted_at ? `
+            <p class="muted">Na lixeira desde ${e(timestamp.format(new Date(account.deleted_at)))}. A restauração libera o acesso ao app e republica os anúncios que continuam aprovados.</p>
+            ${advertiserTrashForm(account, session, false)}` : `
+            <div class="actions"><a class="button primary" href="${path}/editar">Editar dados</a>
+              <a class="button danger" href="${path}/excluir">Excluir anunciante</a></div>`}
+        </section>
+      </div>
+    </div>`, `<a class="back-link" href="${account.deleted_at ? advertiserTrash : advertisers}">${account.deleted_at ? "Voltar à lixeira" : "Voltar aos anunciantes"}</a>`);
+}
+
+export function advertiserForm(account, session, values = account, message = "") {
+  const path = `${advertisers}/${account.id}`;
+  return layout("Editar anunciante", "accounts", session, `
+    <form class="card padded confirmation-card review-form" method="post" action="${path}/editar">
+      ${csrf(session)}<input type="hidden" name="version" value="${e(values.version ?? account.version)}">
+      ${message ? `<p class="alert error" role="alert">${e(message)}</p>` : ""}
+      ${registrationInput(values, "name", "Nome", 160, true)}
+      ${registrationInput(values, "email", "E-mail de acesso ao app", 254, true, "email")}
+      <p class="muted">Ao trocar o e-mail, o anunciante precisará entrar no app com o novo endereço e a senha atual.</p>
+      ${registrationInput(values, "phone", "Telefone", 40, false, "tel")}
+      <div class="actions"><button class="button primary" type="submit">Salvar alterações</button>
+        <a class="button plain" href="${path}">Cancelar</a></div>
+    </form>`, `<a class="back-link" href="${path}">Voltar ao anunciante</a>`);
+}
+
+export function deleteAdvertiserPage(account, session) {
+  return layout("Excluir anunciante", "accounts", session, `
+    <section class="card padded confirmation-card">
+      <h2>${display(account.name)}</h2>
+      <p>Ao mover esta conta para a lixeira, o acesso ao app será bloqueado e os anúncios vinculados sairão do catálogo e dos destaques. O painel preserva os estabelecimentos, as reservas e o histórico.</p>
+      <p class="muted">Você pode restaurar a conta pela lixeira. Para voltar aos destaques, selecione os anúncios novamente.</p>
+      ${advertiserTrashForm(account, session, true)}
+    </section>`, `<a class="back-link" href="${advertisers}/${account.id}">Voltar ao anunciante</a>`);
 }
 
 const bookingKind = (kind) => kind === "mesa" ? "Mesa" : kind === "hospedagem" ? "Hospedagem" : display(kind);
