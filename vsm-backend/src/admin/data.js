@@ -75,8 +75,8 @@ export async function businesses(db, params, deleted = false) {
   const owner = filterId(params.owner);
   const result = await paginate(
     db,
-    `SELECT ${businessSummary}, a.deleted_at AS owner_deleted_at FROM vsm.businesses b
-     JOIN vsm.accounts a ON a.id=b.owner_id
+    `SELECT ${businessSummary}, b.owner_id, a.deleted_at AS owner_deleted_at FROM vsm.businesses b
+     LEFT JOIN vsm.accounts a ON a.id=b.owner_id
      WHERE ($1='' OR strpos(lower(concat_ws(' ', b.data->>'name', b.data->>'city',
            b.data->>'region', a.name, a.email)), lower($1))>0)
        AND ($2='' OR b.status=$2)
@@ -96,7 +96,7 @@ export async function businessRecord(db, id) {
       b.home_highlight,b.explore_highlight,
       b.xmin::text AS version, a.name AS owner_name, a.email AS owner_email,
       a.phone AS owner_phone, a.deleted_at AS owner_deleted_at
-    FROM vsm.businesses b JOIN vsm.accounts a ON a.id=b.owner_id WHERE b.id=$1`, [id]);
+    FROM vsm.businesses b LEFT JOIN vsm.accounts a ON a.id=b.owner_id WHERE b.id=$1`, [id]);
 }
 
 export async function businessDetails(db, id) {

@@ -58,10 +58,12 @@ export async function reviewBusiness(db, { id, action, reason, reviewer, version
 
 export async function setBusinessInTrash(db, { id, version, removing, reviewer }) {
   return transaction(db, async (client) => {
-    const current = await row(client, `SELECT status, deleted_at, xmin::text AS version
+    const current = await row(client, `SELECT owner_id, status, deleted_at, xmin::text AS version
       FROM vsm.businesses WHERE id=$1 FOR UPDATE`, [id]);
     if (!current || current.version !== version || Boolean(current.deleted_at) === removing)
       return null;
+    if (!removing && !current.owner_id)
+      fail(409, "O anunciante foi excluído definitivamente. Este estabelecimento está arquivado para consulta.");
 
     const status = removing ? "Desativado" : "Em análise";
     const updated = await row(client, `UPDATE vsm.businesses

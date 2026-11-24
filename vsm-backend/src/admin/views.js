@@ -10,6 +10,7 @@ const newStore = stores + "/novo";
 const trash = stores + "/lixeira";
 const advertisers = panel + "/anunciantes";
 const advertiserTrash = advertisers + "/lixeira";
+const permanentDeletion = (id) => `${advertisers}/${id}/excluir-definitivamente`;
 const bookings = panel + "/reservas";
 const menu = [
   ["overview", panel, "Visão geral"],
@@ -188,7 +189,8 @@ function businessTable(records, origin, empty) {
   return table(["Estabelecimento", "Localização", "Status", "Ação"], records.map((b) =>
     `<tr><td>${businessCell(b, origin)}</td>
       <td>${display(b.city)}<div class="muted">${display(b.region)}</div></td>
-      <td>${businessBadge(b)}${b.owner_deleted_at ? `<div>${badge("Anunciante na lixeira")}</div>` : ""}</td>
+      <td>${businessBadge(b)}${b.owner_id === null ? `<div>${badge("Anunciante excluído")}</div>` :
+        b.owner_deleted_at ? `<div>${badge("Anunciante na lixeira")}</div>` : ""}</td>
       <td><div class="actions"><a class="button small" href="${stores}/${b.id}" aria-label="Abrir ${e(b.name || "cadastro")}">${b.status === "Em análise" ? "Revisar" : "Ver detalhes"}</a>
         ${b.deleted_at ? "" : `<a class="button small" href="${stores}/${b.id}/editar">Editar</a>`}</div></td></tr>`,
   ), empty, "Estabelecimentos");
@@ -446,7 +448,8 @@ export function businessPage({ business: b, products, activity, subscription, bo
     <div class="detail-top">${businessBadge(b)}<span class="muted">${display(data.city)} · ${display(data.region)}</span>
       ${b.deleted_at ? `<span class="muted">Excluído em ${e(timestamp.format(new Date(b.deleted_at)))}</span>` : ""}</div>
     ${notice ? `<p class="alert success" role="status">${notice}</p>` : ""}
-    ${b.owner_deleted_at ? `<p class="alert">O anunciante está na lixeira. Este estabelecimento está oculto no catálogo.</p>` : ""}
+    ${b.owner_id === null ? `<p class="alert">O anunciante foi excluído definitivamente. Este estabelecimento está arquivado para consulta.</p>` :
+      b.owner_deleted_at ? `<p class="alert">O anunciante está na lixeira. Este estabelecimento está oculto no catálogo.</p>` : ""}
     <div class="detail-grid">
       <div class="stack">
         <section class="card padded">
@@ -467,11 +470,11 @@ export function businessPage({ business: b, products, activity, subscription, bo
           ${rooms.length ? `<details class="disclosure"><summary>Acomodações</summary>
             <ul class="plain-list">${rooms.map((room) => `<li><strong>${e(room.name)}</strong> · ${formatMoney(room.price)} · ${e(room.guests)} hóspedes</li>`).join("")}</ul></details>` : ""}
         </section>
-        <section class="card padded">
+        ${b.owner_id ? `<section class="card padded">
           <div class="section-head inner"><h2>Anunciante</h2><a class="text-link" href="${advertisers}/${b.owner_id}">Ver anunciante</a></div>
           ${details([["Nome", b.owner_name], ["E-mail", b.owner_email], ["Telefone", b.owner_phone]], "contact-fields")}
           <a class="text-link" href="${href(stores, { owner: b.owner_id })}">Outros anúncios</a>
-        </section>
+        </section>` : ""}
         <section class="card"><header class="section-head"><h2>Produtos cadastrados</h2></header>
           ${table(["Produto", "Categoria", "Preço", "Disponibilidade"], products.map((p) =>
             `<tr><td>${display(p.name)}</td><td>${display(p.category)}</td><td>${formatMoney(p.price)}</td><td>${p.available ? "Disponível" : "Indisponível"}</td></tr>`),
@@ -479,7 +482,7 @@ export function businessPage({ business: b, products, activity, subscription, bo
         </section>
       </div>
       <div class="stack">
-        ${b.deleted_at ? `<section class="card padded">
+        ${b.owner_id === null ? "" : b.deleted_at ? `<section class="card padded">
           <h2>Lixeira</h2>
           <p class="muted">Ao restaurar, o estabelecimento volta para a fila de análise.</p>
           ${trashForm(b, session, false)}
@@ -517,11 +520,13 @@ export function businessPage({ business: b, products, activity, subscription, bo
     </div>`, `<a class="back-link" href="${b.deleted_at ? trash : stores}">${b.deleted_at ? "Voltar à lixeira" : "Voltar aos estabelecimentos"}</a>`);
 }
 
-export function accountList(result, session, removed = false) {
+export function accountList(result, session, query = {}) {
   const path = result.deleted ? advertiserTrash : advertisers;
+  const notice = query.apagado === "1" ? "Anunciante excluído definitivamente. O e-mail foi liberado para um novo cadastro." :
+    query.excluido === "1" ? "Anunciante movido para a lixeira." : "";
   return layout(result.deleted ? "Lixeira de anunciantes" : "Anunciantes", "accounts", session, `
     <div class="list-actions"><a class="button" href="${result.deleted ? advertisers : advertiserTrash}">${result.deleted ? "Ver anunciantes" : "Lixeira"}</a></div>
-    ${removed ? '<p class="alert success" role="status">Anunciante movido para a lixeira.</p>' : ""}
+    ${notice ? `<p class="alert success" role="status">${notice}</p>` : ""}
     <section class="card">
       ${filters(path, result.filters, "Nome, e-mail ou telefone")}
       ${table(["Anunciante", "Telefone", "Anúncios", "Ações"], result.records.map((a) =>
@@ -529,7 +534,8 @@ export function accountList(result, session, removed = false) {
           <td>${display(a.phone)}</td><td>${numbers.format(a.businesses)}</td>
           <td><div class="actions">
             <a class="button small" href="${href(stores, { owner: a.id })}">Ver anúncios</a>
-            ${a.deleted_at ? `<a class="button small" href="${advertisers}/${a.id}">Ver e restaurar</a>` : `
+            ${a.deleted_at ? `<a class="button small" href="${advertisers}/${a.id}">Ver e restaurar</a>
+              <a class="button small danger" href="${permanentDeletion(a.id)}">Excluir definitivamente</a>` : `
               <a class="button small" href="${href(newStore, { owner: a.id })}">Cadastrar estabelecimento</a>
               <a class="button small" href="${advertisers}/${a.id}/editar" aria-label="Editar ${e(a.name)}">Editar</a>`}
           </div></td></tr>`),
@@ -549,7 +555,8 @@ function advertiserTrashForm(account, session, removing) {
   return `<form class="actions" method="post" action="${path}/${removing ? "excluir" : "restaurar"}">
     ${csrf(session)}<input type="hidden" name="version" value="${e(account.version)}">
     <button class="button ${removing ? "danger" : "primary"}" type="submit">${removing ? "Mover para a lixeira" : "Restaurar anunciante"}</button>
-    ${removing ? `<a class="button plain" href="${path}">Cancelar</a>` : ""}
+    ${removing ? `<a class="button plain" href="${path}">Cancelar</a>` :
+      `<a class="button danger" href="${permanentDeletion(account.id)}">Excluir definitivamente</a>`}
   </form>`;
 }
 
@@ -614,6 +621,22 @@ export function deleteAdvertiserPage(account, session) {
       <p class="muted">Você pode restaurar a conta pela lixeira. Para voltar aos destaques, selecione os anúncios novamente.</p>
       ${advertiserTrashForm(account, session, true)}
     </section>`, `<a class="back-link" href="${advertisers}/${account.id}">Voltar ao anunciante</a>`);
+}
+
+export function purgeAdvertiserPage(account, session, message = "") {
+  return layout("Excluir anunciante definitivamente", "accounts", session, `
+    <section class="card padded confirmation-card">
+      <h2>${display(account.name)}</h2>
+      <p>Esta ação é irreversível. Os dados da conta e o acesso ao app serão apagados. O e-mail <strong>${e(account.email)}</strong> ficará disponível para um novo cadastro.</p>
+      <p>Os estabelecimentos vinculados ficarão arquivados, com suas reservas disponíveis para consulta.</p>
+      <form class="review-form" method="post" action="${permanentDeletion(account.id)}">
+        ${csrf(session)}<input type="hidden" name="version" value="${e(account.version)}">
+        ${message ? `<p class="alert error" role="alert">${e(message)}</p>` : ""}
+        <label>Digite o e-mail da conta para confirmar<input type="email" name="confirmation" maxlength="254" autocomplete="off" required></label>
+        <div class="actions"><button class="button danger" type="submit">Excluir definitivamente</button>
+          <a class="button plain" href="${advertiserTrash}">Cancelar</a></div>
+      </form>
+    </section>`, `<a class="back-link" href="${advertiserTrash}">Voltar à lixeira</a>`);
 }
 
 const bookingKind = (kind) => kind === "mesa" ? "Mesa" : kind === "hospedagem" ? "Hospedagem" : display(kind);

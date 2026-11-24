@@ -578,6 +578,73 @@ test("Painel web: sessão, revisão com histórico, publicação e consultas de 
       assert.ok(restoredCatalog.products.some(p => p.id === product.json().id));
     });
 
+    await t.test("A exclusão definitiva da lixeira libera o e-mail e preserva as reservas", async () => {
+      const accountPath = `/admin/anunciantes/${account.id}`;
+      const purgePath = accountPath + "/excluir-definitivamente";
+      const originalLogin = await send("POST", "/auth/login", { email, password: owner.password });
+      assert.equal(originalLogin.statusCode, 200);
+      const originalToken = originalLogin.json().token;
+      const activeVersion = extract((await get(accountPath + "/editar", staffCookie)).body, "version");
+      assert.equal((await get(purgePath, staffCookie)).statusCode, 409);
+      assert.equal((await form(purgePath, {
+        csrf: signupCsrf, version: activeVersion, confirmation: email,
+      }, { cookie: staffCookie })).statusCode, 409);
+
+      const removed = await form(accountPath + "/excluir", { csrf: signupCsrf, version: activeVersion }, { cookie: staffCookie });
+      assert.equal(removed.statusCode, 303, removed.body);
+      assert.ok((await get(removed.headers.location, staffCookie)).body.includes(purgePath));
+      const page = await get(purgePath, staffCookie);
+      assert.equal(page.statusCode, 200);
+      assert.match(page.body, /Digite o e-mail da conta para confirmar/);
+      const confirm = { csrf: signupCsrf, version: extract(page.body, "version"), confirmation: email.toUpperCase() };
+      assert.equal((await form(purgePath, confirm)).headers.location, "/admin/entrar");
+      assert.equal((await form(purgePath, { ...confirm, csrf: "inválido" }, { cookie: staffCookie })).statusCode, 403);
+      assert.equal((await form(purgePath, { ...confirm, version: activeVersion }, { cookie: staffCookie })).statusCode, 409);
+      assert.equal((await form(purgePath, { ...confirm, confirmation: "outra@example.test" }, { cookie: staffCookie })).statusCode, 422);
+      const newAccount = { ...owner, email, password: "outra-senha-de-teste" };
+      assert.equal((await send("POST", "/auth/register", newAccount)).statusCode, 409);
+
+      const scope = account.id + ":business";
+      await db.query("INSERT INTO vsm.requests (scope,key,hash) VALUES ($1,'teste','teste')", [scope]);
+      const purge = () => form(purgePath, confirm, { cookie: staffCookie });
+      const outcomes = await Promise.all([purge(), purge()]);
+      assert.deepEqual(outcomes.map(response => response.statusCode).sort(), [303, 404]);
+      const deleted = outcomes.find(response => response.statusCode === 303);
+      assert.match((await get(deleted.headers.location, staffCookie)).body, /e-mail foi liberado para um novo cadastro/);
+      assert.equal((await get(accountPath, staffCookie)).statusCode, 404);
+      assert.equal((await db.query("SELECT id FROM vsm.accounts WHERE id=$1", [account.id])).rowCount, 0);
+      assert.equal((await db.query("SELECT id FROM vsm.admin_advertiser_events WHERE account_id=$1", [account.id])).rowCount, 0);
+      assert.equal((await db.query("SELECT token_hash FROM vsm.sessions WHERE account_id=$1", [account.id])).rowCount, 0);
+      assert.equal((await db.query("SELECT key FROM vsm.requests WHERE scope=$1", [scope])).rowCount, 0);
+
+      const archived = await get(createdPath, staffCookie);
+      assert.equal(archived.statusCode, 200);
+      assert.match(archived.body, /arquivado para consulta/);
+      assert.doesNotMatch(archived.body, /Restaurar para análise/);
+      const record = (await db.query(`SELECT owner_id,status,deleted_at,xmin::text AS version
+        FROM vsm.businesses WHERE id=$1`, [createdId])).rows[0];
+      assert.equal(record.owner_id, null);
+      assert.equal(record.status, "Desativado");
+      assert.ok(record.deleted_at);
+      const restore = await form(createdPath + "/restaurar", { csrf: signupCsrf, version: record.version }, { cookie: staffCookie });
+      assert.equal(restore.statusCode, 409);
+      assert.match((await get("/admin/estabelecimentos/lixeira", staffCookie)).body, /Anunciante excluído/);
+      assert.match((await get(`/admin/reservas/${booked.json().id}`, staffCookie)).body, /Visitante de teste/);
+      const guestHistory = await send("GET", "/reservations", undefined, { "x-guest-token": visitor });
+      assert.ok(guestHistory.json().some(reservation => reservation.id === booked.json().id));
+      assert.equal((await app.inject(new URL(editedBusiness.photo).pathname)).statusCode, 200);
+
+      const registered = await send("POST", "/auth/register", newAccount);
+      assert.equal(registered.statusCode, 201, registered.body);
+      assert.deepEqual((await send("GET", "/me/workspace", undefined, {
+        authorization: "Bearer " + registered.json().token,
+      })).json(), { businesses: [], products: [], reservations: [] });
+      assert.equal((await send("GET", "/me", undefined, { authorization: "Bearer " + originalToken })).statusCode, 401);
+      const catalog = (await app.inject("/catalog")).json();
+      assert.deepEqual(catalog.businesses.map(b => b.name), ["Cafeteria de outra conta"]);
+      assert.deepEqual(catalog.products, []);
+    });
+
     await writeFile(accountsFile, "[]");
     await app.close();
     app = await createApp(team);

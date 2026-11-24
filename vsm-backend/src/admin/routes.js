@@ -7,7 +7,7 @@ import { row } from "../db.js";
 import { reviewBusiness, reviewStates, setBusinessInTrash } from "../moderation.js";
 import { profileInput } from "../schemas.js";
 import { checkPassword, fail, hash } from "../security.js";
-import { editAdvertiser, setAdvertiserInTrash } from "./advertisers.js";
+import { deleteAdvertiserPermanently, editAdvertiser, setAdvertiserInTrash } from "./advertisers.js";
 import * as data from "./data.js";
 import { createBusiness, editBusiness, registrationPhotos, weekdays } from "./registration.js";
 import * as view from "./views.js";
@@ -174,6 +174,7 @@ export async function adminRoutes(app, { db, origin, mediaDir, admin }) {
     async function editableRecord(id) {
       const business = await data.businessRecord(db, id);
       if (!business) fail(404, "Estabelecimento não encontrado.");
+      if (!business.owner_id) fail(409, "Este estabelecimento está arquivado para consulta.");
       if (business.deleted_at) fail(409, "Restaure o estabelecimento da lixeira antes de editar.");
       return business;
     }
@@ -279,7 +280,7 @@ export async function adminRoutes(app, { db, origin, mediaDir, admin }) {
       html(reply, view.accountList(await data.accounts(db, request.query), request.adminSession)));
     panel.get("/anunciantes/lixeira", async (request, reply) =>
       html(reply, view.accountList(await data.accounts(db, request.query, true), request.adminSession,
-        request.query.excluido === "1")));
+        request.query)));
     panel.get("/anunciantes/:id", async (request, reply) => {
       const account = await data.advertiserRecord(db, requireId(request.params.id));
       const history = await data.advertiserHistory(db, account.id);
@@ -327,6 +328,27 @@ export async function adminRoutes(app, { db, origin, mediaDir, admin }) {
     }
     panel.post("/anunciantes/:id/excluir", (request, reply) => changeAdvertiserTrash(request, reply, true));
     panel.post("/anunciantes/:id/restaurar", (request, reply) => changeAdvertiserTrash(request, reply, false));
+    async function archivedAdvertiser(id) {
+      const account = await data.advertiserRecord(db, id);
+      if (!account.deleted_at) fail(409, "Mova o anunciante para a lixeira antes da exclusão definitiva.");
+      return account;
+    }
+    panel.get("/anunciantes/:id/excluir-definitivamente", async (request, reply) => {
+      const account = await archivedAdvertiser(requireId(request.params.id));
+      return html(reply, view.purgeAdvertiserPage(account, request.adminSession));
+    });
+    panel.post("/anunciantes/:id/excluir-definitivamente", async (request, reply) => {
+      const id = requireId(request.params.id);
+      const { version, confirmation } = request.body ?? {};
+      try {
+        await deleteAdvertiserPermanently(db, { id, version, confirmation });
+      } catch (error) {
+        if (error.statusCode !== 422) throw error;
+        const account = await archivedAdvertiser(id);
+        return html(reply.code(422), view.purgeAdvertiserPage(account, request.adminSession, error.message));
+      }
+      return reply.redirect("/admin/anunciantes/lixeira?apagado=1", 303);
+    });
     panel.get("/reservas", async (request, reply) =>
       html(reply, view.bookingList(await data.bookings(db, request.query), request.adminSession)));
     panel.get("/reservas/:id", async (request, reply) => {
