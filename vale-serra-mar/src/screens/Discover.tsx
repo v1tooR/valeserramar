@@ -1,7 +1,7 @@
 import { Alert } from "../components/Dialogs";
 import { CollectionState } from "../components/CollectionState";
 import { Tap as Pressable } from "../components/Motion";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Image,
   ImageBackground,
@@ -10,8 +10,14 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { assets, photoSource } from "../assets";
-import { regionForCity, regions, segments } from "../domain/catalog";
+import { assets } from "../assets";
+import {
+  catalogFiltersFor,
+  emptyCatalogFilters,
+  regionForCity,
+  regions,
+  segments,
+} from "../domain/catalog";
 import {
   advertisingAgency,
   categoryForSelection,
@@ -26,12 +32,10 @@ import { useStore } from "../store";
 import { useNav, type ScreenProps } from "../navigation";
 import { colors as c, styles as s } from "../theme";
 import {
-  Badge,
   Button,
   Chip,
   Field,
   Icon,
-  IconButton,
   Notice,
   Page,
   Row,
@@ -41,14 +45,6 @@ import {
 } from "../components/ui";
 import { BusinessCard } from "../components/BusinessCard";
 import { HighlightCarousel } from "../components/HighlightCarousel";
-export const emptyFilters: Filters = {
-  city: "",
-  segment: "",
-  district: "",
-  openNow: false,
-  menu: false,
-  reservations: false,
-};
 const welcomePhotos: Record<string, number> = {
   "Serra da Mantiqueira": require("../../assets/regiao-serra.png"),
   "Vale do Paraíba": require("../../assets/regiao-vale.png"),
@@ -186,6 +182,7 @@ const homeCategories = [
 ] as const satisfies readonly { label: string; category: ExploreCategory }[];
 function HomeCategories() {
   const nav = useNav();
+  const { setCatalogFilters } = useStore();
   return (
     <View style={[s.row, { alignItems: "flex-start", gap: 6 }]}>
       {homeCategories.map(({ label, category }) => {
@@ -195,7 +192,10 @@ function HomeCategories() {
             accessibilityRole="button"
             accessibilityLabel={label}
             key={category}
-            onPress={() => nav.navigate("Results", { category })}
+            onPress={() => {
+              setCatalogFilters({ segment: category, query: "" });
+              nav.navigate("Results");
+            }}
             style={{
               alignItems: "center",
               gap: 8,
@@ -235,18 +235,18 @@ function HomeCategories() {
 export function HomeScreen() {
   const { state } = useStore(),
     nav = useNav();
-  const local = state.businesses.filter(
-    (b) =>
-      b.status === "Aprovado" &&
-      b.region === state.region &&
-      (!state.city || b.city === state.city),
+  const local = filterBusinesses(
+    state.businesses,
+    { ...emptyCatalogFilters, city: state.city },
+    "",
+    regionForCity(state.city) ?? state.region,
   );
   const sorted = [...local].sort(
     (a, b) =>
       Number(state.interests.includes(b.segment)) -
       Number(state.interests.includes(a.segment)),
   );
-  const highlights = highlightedBusinesses(state.businesses, "home");
+  const highlights = highlightedBusinesses(local, "home");
   return (
     <Page brand tab="Home">
       <View>
@@ -278,7 +278,7 @@ export function HomeScreen() {
         >
           <View style={{ padding: 14, backgroundColor: "#104B38CC" }}>
             <Text style={{ color: "white", fontSize: 17, fontWeight: "700" }}>
-              Explore {state.region} →
+              Ver estabelecimentos →
             </Text>
           </View>
         </ImageBackground>
@@ -299,50 +299,100 @@ export function HomeScreen() {
   );
 }
 export function SearchScreen() {
-  const { state, update } = useStore(),
+  const { state, update, setCatalogFilters, loading, loadError } = useStore(),
     nav = useNav();
-  const [query, setQuery] = useState("");
+  const filters = catalogFiltersFor(state);
+  const { query, city, region } = filters;
+  const term = query.trim();
+  const matches = useMemo(
+    () => filterBusinesses(state.businesses, filters, term, region),
+    [state.businesses, filters, term, region],
+  );
   const search = (text: string) => {
-    if (text.trim())
+    const value = text.trim();
+    if (value) {
+      setCatalogFilters({ query: value });
       update((s) => ({
         ...s,
-        recent: [
-          text.trim(),
-          ...s.recent.filter((x) => x !== text.trim()),
-        ].slice(0, 6),
+        recent: [value, ...s.recent.filter((x) => x !== value)].slice(0, 6),
       }));
-    nav.navigate("Results", { query: text });
+    }
+    nav.navigate("Results");
   };
+  const searchBar = (
+    <View style={explore.section}>
+      <Text accessibilityRole="header" style={s.title}>
+        Explorar
+      </Text>
+      <View style={[s.row, explore.searchBar]}>
+        <TextInput
+          accessibilityLabel="Buscar no guia"
+          placeholder="Nome, categoria ou cidade"
+          placeholderTextColor="#586B61"
+          style={explore.searchInput}
+          value={query}
+          onChangeText={(query) => setCatalogFilters({ query })}
+          returnKeyType="search"
+          onSubmitEditing={() => search(query)}
+        />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Buscar"
+          style={explore.searchButton}
+          onPress={() => search(query)}
+        >
+          <Icon name="search" size={22} color={c.white} />
+        </Pressable>
+      </View>
+      <View style={s.wrap}>
+        <Chip
+          title={city || region || "Todas as regiões"}
+          selected
+          onPress={() => nav.navigate("Filters")}
+        />
+        <Chip title="Filtros" onPress={() => nav.navigate("Results")} />
+      </View>
+    </View>
+  );
+  if (term) {
+    return (
+      <Page tab="Search">
+        {searchBar}
+        <Section
+          title={resultLabel(matches.length)}
+          action="Ver lista"
+          onPress={() => search(query)}
+        />
+        <CollectionState
+          empty={matches.length === 0}
+          title="Nenhum estabelecimento encontrado"
+          description="Experimente outro nome, categoria ou cidade."
+        />
+        {matches.length === 0 && !loading && !loadError && region && (
+          <Button
+            secondary
+            title="Buscar em todas as regiões"
+            onPress={() => setCatalogFilters({ region: "", city: "" })}
+          />
+        )}
+        {matches.slice(0, 6).map((business) => (
+          <BusinessCard key={business.id} business={business} />
+        ))}
+      </Page>
+    );
+  }
   return (
     <Page tab="Search">
+      {searchBar}
+      <HighlightCarousel
+        businesses={highlightedBusinesses(matches, "explore")}
+      />
       <View style={explore.section}>
-        <Text accessibilityRole="header" style={s.title}>
-          Explorar
-        </Text>
-        <View style={[s.row, explore.searchBar]}>
-          <TextInput
-            accessibilityLabel="Buscar no guia"
-            placeholder="Nome, categoria ou cidade"
-            placeholderTextColor="#586B61"
-            style={explore.searchInput}
-            value={query}
-            onChangeText={setQuery}
-            returnKeyType="search"
-            onSubmitEditing={() => search(query)}
-          />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Buscar"
-            style={explore.searchButton}
-            onPress={() => search(query)}
-          >
-            <Icon name="search" size={22} color={c.white} />
-          </Pressable>
-        </View>
-      </View>
-      <HighlightCarousel businesses={highlightedBusinesses(state.businesses, "explore")} />
-      <View style={explore.section}>
-        <Section title="Buscar por categoria" />
+        <Section
+          title="Buscar por categoria"
+          action="Ver lista"
+          onPress={() => nav.navigate("Results")}
+        />
         <View style={explore.categoryGrid}>
           {categoryRows.map((row) => (
             <View key={row[0]} style={explore.categoryRow}>
@@ -354,7 +404,10 @@ export function SearchScreen() {
                     accessibilityRole="button"
                     accessibilityLabel={category}
                     style={[explore.categoryCard, { backgroundColor: color }]}
-                    onPress={() => nav.navigate("Results", { category })}
+                    onPress={() => {
+                      setCatalogFilters({ segment: category });
+                      nav.navigate("Results");
+                    }}
                   >
                     <View style={explore.categoryCardTop}>
                       <View style={explore.categoryIcon}>
@@ -366,7 +419,9 @@ export function SearchScreen() {
                   </Pressable>
                 );
               })}
-              {row.length < categoryColumns && <View style={explore.categorySpacer} />}
+              {row.length < categoryColumns && (
+                <View style={explore.categorySpacer} />
+              )}
             </View>
           ))}
         </View>
@@ -396,10 +451,10 @@ export function SearchScreen() {
               <Chip
                 key={city}
                 title={city}
-                selected={state.city === city}
+                selected={filters.city === city}
                 onPress={() => {
-                  update((s) => ({ ...s, city, region: region.name }));
-                  nav.navigate("Results", { filters: { ...emptyFilters, city } });
+                  setCatalogFilters({ city, region: region.name });
+                  nav.navigate("Results");
                 }}
               />
             )),
@@ -509,231 +564,260 @@ function SubcategoryFilters({
     </>
   );
 }
+function resultLabel(count: number) {
+  return count === 1 ? "1 lugar encontrado" : `${count} lugares encontrados`;
+}
+
+type FilterGroup = "location" | "category" | "more";
+
 export function ResultsScreen({ route }: ScreenProps) {
-  const { state, loading, loadError } = useStore(),
+  const { state, loading, loadError, setCatalogFilters } = useStore(),
     nav = useNav();
-  const [query, setQuery] = useState(route.params?.query || "");
-  const [filters, setFilters] = useState<Filters>({
-    ...emptyFilters,
-    segment: route.params?.category || "",
-    ...route.params?.filters,
-  });
-  const [showFilters, setShowFilters] = useState(route.name === "Filters");
-  const [allRegions, setAllRegions] = useState(
-    route.params?.allRegions || false,
+  const filters = catalogFiltersFor(state);
+  const { query, region } = filters;
+  const [group, setGroup] = useState<FilterGroup | null>(
+    route.name === "Filters" ? "location" : null,
   );
   const category = categoryForSelection(filters.segment);
-  const region = regionForCity(filters.city) ?? state.region;
-  const results = filterBusinesses(
-    state.businesses,
-    filters,
-    query,
-    allRegions ? "" : region,
+  const results = filterBusinesses(state.businesses, filters, query, region);
+  const availableCities = region
+    ? (regions.find((item) => item.name === region)?.cities ?? [])
+    : regions.flatMap((item) => item.cities);
+  const hasMore = Boolean(
+    filters.district.trim() || filters.menu || filters.reservations,
   );
-  if (showFilters)
-    return (
-      <FilterForm
-        filters={filters}
-        setFilters={setFilters}
-        onDone={() => setShowFilters(false)}
-        count={results.length}
-      />
-    );
+  const defaultRegion = regionForCity(state.city) ?? state.region;
+  const canClear =
+    filters.city !== state.city ||
+    region !== defaultRegion ||
+    Boolean(filters.segment || filters.openNow || hasMore);
+
+  const changeFilter = <K extends keyof Filters>(key: K, value: Filters[K]) => {
+    setCatalogFilters({ [key]: value });
+  };
+  const toggleGroup = (next: FilterGroup) => {
+    setGroup((current) => (current === next ? null : next));
+  };
+  const chooseRegion = (nextRegion: string) => {
+    setCatalogFilters({ region: nextRegion, city: "" });
+  };
+  const chooseCity = (city: string) => {
+    setCatalogFilters({ city, region: regionForCity(city) ?? region });
+    setGroup(null);
+  };
+  const chooseCategory = (segment: string) => {
+    changeFilter("segment", segment);
+    setGroup(null);
+  };
+
   return (
-    <Page
-      title={category || "Explorar"}
-      tab="Search"
-      right={
-        <IconButton
-          icon="sliders"
-          label="Filtros"
-          onPress={() => setShowFilters(true)}
-        />
-      }
-    >
-      <Field
-        label="Busca"
-        placeholder="Nome, categoria ou cidade"
-        value={query}
-        onChangeText={setQuery}
-      />
-      <SubcategoryFilters
-        category={category}
-        value={filters.segment}
-        onChange={(segment) => setFilters((f) => ({ ...f, segment }))}
-      />
-      <View style={s.row}>
-        <Chip title="Lista" selected onPress={() => {}} />
-        <Chip
-          title="Mapa"
-          onPress={() =>
-            nav.navigate("Map", {
-              query,
-              category: filters.segment,
-              filters,
-              allRegions,
-            })
+    <Page title={category || "Estabelecimentos"} tab="Search" keyboardAware>
+      <View style={explore.section}>
+        <Field
+          label="Busca"
+          placeholder="Nome, categoria ou cidade"
+          value={query}
+          onChangeText={(query) => setCatalogFilters({ query })}
+          action={
+            query
+              ? {
+                  icon: "x",
+                  label: "Limpar busca",
+                  onPress: () => setCatalogFilters({ query: "" }),
+                }
+              : undefined
           }
         />
+        <View style={s.wrap}>
+          <Chip
+            title={filters.city || region || "Todas as regiões"}
+            selected={group === "location" || Boolean(filters.city || region)}
+            onPress={() => toggleGroup("location")}
+          />
+          <Chip
+            title={category || "Categoria"}
+            selected={group === "category" || Boolean(filters.segment)}
+            onPress={() => toggleGroup("category")}
+          />
+          <Chip
+            title="Aberto agora"
+            selected={filters.openNow}
+            onPress={() => changeFilter("openNow", !filters.openNow)}
+          />
+          <Chip
+            title="Mais filtros"
+            selected={group === "more" || hasMore}
+            onPress={() => toggleGroup("more")}
+          />
+        </View>
+        <View style={s.between}>
+          <Text style={s.label} accessibilityLiveRegion="polite">
+            {resultLabel(results.length)}
+          </Text>
+          {canClear && (
+            <Chip
+              title="Limpar filtros"
+              onPress={() => {
+                setCatalogFilters({
+                  ...emptyCatalogFilters,
+                  city: state.city,
+                  region: defaultRegion,
+                  query,
+                });
+                setGroup(null);
+              }}
+            />
+          )}
+        </View>
+        {group === "location" && (
+          <View style={[s.card, { backgroundColor: c.soft }]}>
+            <Section title="Região" />
+            <View style={s.wrap}>
+              <Chip
+                title="Todas as regiões"
+                selected={!region}
+                onPress={() => chooseRegion("")}
+              />
+              {regions.map(({ name }) => (
+                <Chip
+                  key={name}
+                  title={name}
+                  selected={region === name}
+                  onPress={() => chooseRegion(name)}
+                />
+              ))}
+            </View>
+            <Section title="Cidade" />
+            <View style={s.wrap}>
+              <Chip
+                title="Todas as cidades"
+                selected={!filters.city}
+                onPress={() => chooseCity("")}
+              />
+              {availableCities.map((city) => (
+                <Chip
+                  key={city}
+                  title={city}
+                  selected={filters.city === city}
+                  onPress={() => chooseCity(city)}
+                />
+              ))}
+            </View>
+          </View>
+        )}
+        {group === "category" && (
+          <View style={[s.card, { backgroundColor: c.soft }]}>
+            <Section title="Categoria" />
+            <View style={s.wrap}>
+              <Chip
+                title="Todas as categorias"
+                selected={!filters.segment}
+                onPress={() => chooseCategory("")}
+              />
+              {exploreCategories.map((name) => (
+                <Chip
+                  key={name}
+                  title={name}
+                  selected={category === name}
+                  onPress={() => chooseCategory(name)}
+                />
+              ))}
+            </View>
+          </View>
+        )}
+        {group === "more" && (
+          <View style={[s.card, { backgroundColor: c.soft }]}>
+            <Field
+              label="Bairro"
+              value={filters.district}
+              onChangeText={(district) => changeFilter("district", district)}
+            />
+            <Toggle
+              title="Cardápio digital"
+              value={filters.menu}
+              onChange={(menu) => changeFilter("menu", menu)}
+            />
+            <Toggle
+              title="Aceita reservas"
+              value={filters.reservations}
+              onChange={(reservations) =>
+                changeFilter("reservations", reservations)
+              }
+            />
+          </View>
+        )}
+        <SubcategoryFilters
+          category={category}
+          value={filters.segment}
+          onChange={(segment) => changeFilter("segment", segment)}
+        />
       </View>
-      <View style={s.wrap}>
-        <Chip
-          title={allRegions ? "Todas as regiões" : region}
-          selected
-          onPress={() => setAllRegions(!allRegions)}
-        />
-        <Chip
-          title="Aberto agora"
-          selected={filters.openNow}
-          onPress={() => setFilters((f) => ({ ...f, openNow: !f.openNow }))}
-        />
+      <View style={s.row}>
+        <Chip title="Lista" selected onPress={() => {}} />
+        <Chip title="Mapa" onPress={() => nav.navigate("Map")} />
       </View>
       {category && (
-        <HighlightCarousel businesses={highlightedBusinesses(results, "explore")} />
+        <HighlightCarousel
+          businesses={highlightedBusinesses(results, "explore")}
+        />
       )}
-      <Text style={s.label}>{results.length} lugares encontrados</Text>
       {results.map((b) => (
         <BusinessCard key={b.id} business={b} />
       ))}
-      <CollectionState empty={false} />
-      {results.length === 0 && !loading && !loadError && (
-        <>
-          <View style={{ alignItems: "center", paddingVertical: 30, gap: 14 }}>
-            <Icon name="search" size={48} />
-            <Text style={s.heading}>Nada encontrado</Text>
-            <Text style={[s.muted, { textAlign: "center" }]}>
-              Tente outra palavra, remova os filtros ou procure em cidades
-              próximas.
-            </Text>
-          </View>
-          <Button
-            title="Remover filtros"
-            onPress={() => {
-              setFilters(emptyFilters);
-              setQuery("");
-            }}
-          />
-          <Button
-            secondary
-            title="Buscar em todas as regiões"
-            onPress={() => setAllRegions(true)}
-          />
-          {!category && (
-            <>
-              <Section title="Talvez você goste" />
-              {state.businesses
-                .filter((b) => b.status === "Aprovado")
-                .slice(0, 2)
-                .map((b) => (
-                  <BusinessCard key={b.id} business={b} />
-                ))}
-            </>
-          )}
-        </>
+      <CollectionState
+        empty={results.length === 0}
+        title="Nenhum estabelecimento encontrado"
+        description="Tente outro termo ou ajuste os filtros."
+      />
+      {results.length === 0 && !loading && !loadError && region && (
+        <Button
+          secondary
+          title="Buscar em todas as regiões"
+          onPress={() => {
+            chooseRegion("");
+            setGroup(null);
+          }}
+        />
       )}
-    </Page>
-  );
-}
-function FilterForm({
-  filters,
-  setFilters,
-  onDone,
-  count,
-}: {
-  filters: Filters;
-  setFilters: React.Dispatch<React.SetStateAction<Filters>>;
-  onDone: () => void;
-  count: number;
-}) {
-  const category = categoryForSelection(filters.segment);
-  return (
-    <Page
-      title="Filtros"
-      right={
-        <Pressable onPress={() => setFilters(emptyFilters)}>
-          <Text style={s.label}>Limpar</Text>
-        </Pressable>
-      }
-      footer={<Button title={`Ver ${count} resultados`} onPress={onDone} />}
-    >
-      <Section title="Cidade" />
-      <View style={s.wrap}>
-        <Chip
-          title="Todas"
-          selected={!filters.city}
-          onPress={() => setFilters((f) => ({ ...f, city: "" }))}
-        />
-        {regions
-          .flatMap((r) => r.cities)
-          .map((city) => (
-            <Chip
-              key={city}
-              title={city}
-              selected={filters.city === city}
-              onPress={() => setFilters((f) => ({ ...f, city }))}
-            />
-          ))}
-      </View>
-      <Section title="Categoria" />
-      <View style={s.wrap}>
-        <Chip
-          title="Todas"
-          selected={!filters.segment}
-          onPress={() => setFilters((f) => ({ ...f, segment: "" }))}
-        />
-        {exploreCategories.map((name) => (
-          <Chip
-            key={name}
-            title={name}
-            selected={category === name}
-            onPress={() => setFilters((f) => ({ ...f, segment: name }))}
-          />
-        ))}
-      </View>
-      <SubcategoryFilters
-        category={category}
-        value={filters.segment}
-        onChange={(segment) => setFilters((f) => ({ ...f, segment }))}
-      />
-      <Field
-        label="Bairro (opcional)"
-        value={filters.district}
-        onChangeText={(district) => setFilters((f) => ({ ...f, district }))}
-      />
-      <Toggle
-        title="Aberto agora"
-        value={filters.openNow}
-        onChange={(openNow) => setFilters((f) => ({ ...f, openNow }))}
-      />
-      <Toggle
-        title="Cardápio digital"
-        value={filters.menu}
-        onChange={(menu) => setFilters((f) => ({ ...f, menu }))}
-      />
-      <Toggle
-        title="Aceita reservas"
-        value={filters.reservations}
-        onChange={(reservations) => setFilters((f) => ({ ...f, reservations }))}
-      />
     </Page>
   );
 }
 export function PreferencesScreen() {
   const { state, update } = useStore(),
     nav = useNav();
-  const [region, setRegion] = useState(state.region || regions[0].name),
-    [city, setCity] = useState(state.city || "Caçapava"),
-    [interests, setInterests] = useState(state.interests);
+  const region =
+    regions.find((item) => item.name === state.region) ?? regions[0];
+  const city = region.cities.includes(state.city)
+    ? state.city
+    : region.cities[0];
+  const chooseLocation = (region: (typeof regions)[number], city?: string) => {
+    update((current) => {
+      const nextCity =
+        city ??
+        (region.cities.includes(current.city)
+          ? current.city
+          : region.cities[0]);
+      return {
+        ...current,
+        region: region.name,
+        city: nextCity,
+        catalogFilters: current.catalogFilters
+          ? {
+              ...current.catalogFilters,
+              region: region.name,
+              city: nextCity,
+            }
+          : null,
+      };
+    });
+  };
   return (
     <Page
       title="Região e interesses"
       footer={
         <Button
-          title="Salvar preferências"
-          onPress={() => {
-            update((s) => ({ ...s, region, city, interests }));
-            nav.navigate("Home");
-          }}
+          title="Ver estabelecimentos"
+          onPress={() => nav.navigate("Results")}
         />
       }
     >
@@ -742,25 +826,20 @@ export function PreferencesScreen() {
         <Chip
           key={r.name}
           title={r.name}
-          selected={r.name === region}
-          onPress={() => {
-            setRegion(r.name);
-            setCity(r.cities[0]);
-          }}
+          selected={r.name === region.name}
+          onPress={() => chooseLocation(r)}
         />
       ))}
       <Section title="Cidade" />
       <View style={s.wrap}>
-        {regions
-          .find((r) => r.name === region)!
-          .cities.map((name) => (
-            <Chip
-              key={name}
-              title={name}
-              selected={name === city}
-              onPress={() => setCity(name)}
-            />
-          ))}
+        {region.cities.map((name) => (
+          <Chip
+            key={name}
+            title={name}
+            selected={name === city}
+            onPress={() => chooseLocation(region, name)}
+          />
+        ))}
       </View>
       <Section title="O que você gosta de explorar?" />
       <Text style={s.muted}>Escolha quantas opções quiser.</Text>
@@ -769,11 +848,14 @@ export function PreferencesScreen() {
           <Chip
             key={name}
             title={name}
-            selected={interests.includes(name)}
+            selected={state.interests.includes(name)}
             onPress={() =>
-              setInterests((a) =>
-                a.includes(name) ? a.filter((x) => x !== name) : [...a, name],
-              )
+              update((current) => ({
+                ...current,
+                interests: current.interests.includes(name)
+                  ? current.interests.filter((item) => item !== name)
+                  : [...current.interests, name],
+              }))
             }
           />
         ))}

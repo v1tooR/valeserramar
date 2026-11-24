@@ -1,8 +1,8 @@
 # API do Vila Serra e Mar
 
 A API usa Node.js e PostgreSQL. O aplicativo chama a API por HTTPS. A senha do
-banco fica na VPS. As tabelas estão no schema privado `vsm`. O projeto Supabase
-é usado como PostgreSQL gerenciado, com autenticação servida por esta API.
+banco fica na configuração do serviço. As tabelas estão no schema privado
+`vsm`, no PostgreSQL apontado por `DATABASE_URL`. A API gerencia a autenticação.
 
 ## Instalação na VPS
 
@@ -17,8 +17,8 @@ banco fica na VPS. As tabelas estão no schema privado `vsm`. O projeto Supabase
    `umask 077` e `cp .env.example .env`. Preencha `PUBLIC_URL` e `API_DOMAIN`
    com o mesmo host. Use `WEB_ORIGINS` somente se usar a versão web e informe as
    origens permitidas separadas por vírgula.
-4. No Supabase, abra **Connect** e copie a string **Session pooler** para
-   `DATABASE_URL` quando a conexão da VPS exigir IPv4. Substitua a senha no
+4. Se você usa Supabase, abra **Connect** e copie a string **Session pooler**
+   para `DATABASE_URL` quando a conexão da VPS exigir IPv4. Substitua a senha no
    painel/arquivo da VPS. Codifique caracteres especiais no trecho da senha
    da URL. Use um projeto dedicado e confira a conta do banco que será usada para
    criar o schema. O backend exige TLS verificado em produção. Se a conexão
@@ -45,8 +45,75 @@ Defina apenas `EXPO_PUBLIC_API_URL=https://api.seudominio.com.br` no ambiente do
 app. Reinicie o Expo e gere um novo build para distribuir a URL nos aparelhos.
 O catálogo começa vazio. Cadastre um negócio real, envie para análise e aprove.
 
-O painel de administração web ainda está fora desta fase. Para revisar anúncios
-na VPS, use os comandos abaixo em uma sessão autorizada de administração:
+## Painel administrativo web
+
+O painel fica em `/admin`. Na produção do Vila Serra e Mar, acesse
+[api.valeserraemar.com.br/admin](https://api.valeserraemar.com.br/admin) após
+habilitar o painel no serviço.
+
+- **Visão geral** mostra os totais e a fila de estabelecimentos em análise.
+- **Estabelecimentos** permite buscar, filtrar e conferir cadastros, fotos e
+  produtos. A revisão permite aprovar, solicitar correções, recusar e desativar.
+  **Cadastrar estabelecimento** vincula um novo anúncio ao e-mail de uma
+  conta de anunciante do app. O cadastro entra na fila de análise com os dados
+  informados no formulário. A seção **Fotos** aceita capa, logotipo e uma galeria
+  opcional de até 20 imagens de 8 MB cada. O servidor redimensiona fotos maiores
+  que 1.600 pixels no lado mais longo.
+  **Editar** altera dados, localização, horários e imagens. A galeria permite
+  adicionar fotos e marcar as que devem ser removidas. As alterações de
+  um anúncio já aprovado ficam disponíveis no catálogo ao salvar. **Excluir**
+  move o cadastro para a lixeira e o retira do catálogo e da área do anunciante.
+  A lixeira guarda os registros vinculados e permite restaurar o cadastro para
+  análise. A revisão também permite reativar um estabelecimento desativado.
+- **Anunciantes**, **Reservas** e **Assinaturas** oferecem consultas para suporte.
+- **Atividade** permite buscar cadastros, edições, exclusões, restaurações e
+  decisões de revisão pelo estabelecimento, pelo administrador ou pela ação.
+
+O painel usa uma conta administrativa inicial configurada no servidor. Cada
+administrador tem sua própria sessão web de 8 horas. A aprovação publica o
+cadastro no mesmo catálogo que o aplicativo consulta. O motivo da correção
+aparece na área do anunciante.
+
+### Habilitar o acesso administrativo
+
+1. Na pasta `vsm-backend` da versão atualizada, gere o hash da sua senha em Bash.
+
+   ```bash
+   read -rsp 'Senha do painel: ' senha_painel
+   printf '\n'
+   printf '%s' "$senha_painel" | npm run --silent admin:hash
+   unset senha_painel
+   ```
+
+2. Adicione estas variáveis de ambiente ao serviço da API e substitua os valores
+   pelo e-mail do administrador e pela saída do comando anterior.
+
+   ```dotenv
+   ADMIN_EMAIL=seu-email@exemplo.com
+   ADMIN_PASSWORD_HASH=cole_o_hash_gerado
+   ```
+
+   Para o serviço `valeserraemar-api.service` da Hostinger, consulte
+   `systemctl show valeserraemar-api.service -p EnvironmentFiles -p WorkingDirectory -p User`
+   para localizar o arquivo de configuração e o diretório de trabalho.
+   Use a URL pública HTTPS da API em `PUBLIC_URL`. Para validar localmente,
+   você pode usar `http://localhost:3000` com um banco de teste.
+
+3. Aplique `npm run migrate` com a configuração de banco e TLS do serviço.
+   A migração cria as tabelas de sessão e histórico do painel. Em Docker Compose,
+   use `docker compose run --rm --no-deps api node src/migrate.js` após o build.
+4. Inicie a API com `npm start` no ambiente local ou reinicie o serviço
+   atualizado na VPS. Abra `/admin` no navegador e entre com o e-mail e a senha
+   escolhidos.
+
+Na Hostinger, a atualização de contas instala `vsm-admin-criar`. Rode esse
+comando como root para cadastrar um administrador adicional com e-mail e senha
+próprios. A API lê essas contas do arquivo privado definido por
+`ADMIN_ACCOUNTS_FILE` e registra o e-mail de quem fez cada revisão.
+
+### Revisar pelo terminal
+
+Em uma sessão autorizada de administração, use os comandos abaixo.
 
 ```bash
 docker compose exec api node src/review.js listar

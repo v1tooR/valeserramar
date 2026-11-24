@@ -130,6 +130,50 @@ it("busca ignora acentos e esconde anúncios não aprovados", () => {
     ),
   ).toEqual([]);
 });
+it("usa a cidade real mesmo quando um cadastro antigo tem a região incorreta", () => {
+  const coast = {
+    ...businesses[0],
+    id: "coast",
+    city: "Ilha Bela",
+    region: "Vale do Paraíba",
+  };
+  const records = [...businesses, coast];
+  expect(filterBusinesses(records, filters, "", "Vale do Paraíba")).toEqual(
+    businesses,
+  );
+  expect(
+    filterBusinesses(records, { ...filters, city: "Caçapava" }, "", ""),
+  ).toEqual(businesses);
+  expect(
+    filterBusinesses(
+      records,
+      { ...filters, city: "Ilhabela" },
+      "",
+      "Litoral Norte",
+    ),
+  ).toEqual([coast]);
+});
+it("exige uma vaga válida do painel em cada local de destaque", () => {
+  const base = { ...businesses[0], photo: "https://example.test/capa.png" };
+  const records = [
+    businessSchema.parse({ ...base, id: "sem-destaque", highlights: null }),
+    businessSchema.parse({
+      ...base,
+      id: "antigo",
+      highlighted: true,
+      highlights: { home: 0, explore: "1" },
+    }),
+    businessSchema.parse({
+      ...base,
+      id: "so-categoria",
+      highlights: { explore: 1 },
+    }),
+  ];
+  expect(highlightedBusinesses(records, "home")).toEqual([]);
+  expect(
+    highlightedBusinesses(records, "explore").map((business) => business.id),
+  ).toEqual(["so-categoria"]);
+});
 it("encontra estabelecimentos em Paraibuna e Monteiro Lobato", () => {
   const valley = "Vale do Paraíba", mountain = "Serra da Mantiqueira";
   const cities = [

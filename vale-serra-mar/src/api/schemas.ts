@@ -5,6 +5,7 @@ import {
   lodgingSubcategories,
 } from "../domain/categories";
 const photo = z.string();
+const highlightSlot = z.number().int().min(1).max(15).nullable().catch(null);
 const hours = z.object({
   day: z.string(),
   open: z.boolean(),
@@ -65,10 +66,11 @@ export const businessSchema = z.object({
   ]),
   correction: z.string(),
   owner: z.boolean(),
-  highlights: z.object({
-    home: z.number().int().min(1).max(15).nullable(),
-    explore: z.number().int().min(1).max(15).nullable(),
-  }).optional(),
+  highlights: z
+    .object({ home: highlightSlot, explore: highlightSlot })
+    .nullish()
+    .transform((value) => value ?? undefined)
+    .catch(undefined),
 });
 export const productSchema = z.object({
   id: z.string(),
@@ -128,4 +130,17 @@ export const preferencesSchema = z.object({
   interests: z.array(z.string()),
   favorites: z.array(z.string()),
   recent: z.array(z.string()),
+  catalogFilters: z
+    .object({
+      region: z.string(),
+      city: z.string(),
+      segment: z.string(),
+      district: z.string(),
+      openNow: z.boolean(),
+      menu: z.boolean(),
+      reservations: z.boolean(),
+      query: z.string(),
+    })
+    .nullish()
+    .catch(null),
 });

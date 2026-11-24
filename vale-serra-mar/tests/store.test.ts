@@ -1,8 +1,9 @@
 import { expect, it, jest } from "@jest/globals";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import React from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { StoreProvider, useStore } from "../src/store";
-import { initialState } from "../src/domain/catalog";
+import { catalogFiltersFor, initialState } from "../src/domain/catalog";
 import { repository } from "../src/api/repository";
 import type { Reservation } from "../src/domain/models";
 jest.mock("@react-native-async-storage/async-storage", () =>
@@ -30,6 +31,63 @@ it("inicia sem estabelecimentos, produtos ou conta pré-criada", () => {
   expect(initialState.products).toEqual([]);
   expect(initialState.profile).toBeNull();
   expect(initialState.authenticated).toBe(false);
+});
+it("reabre o app com os mesmos filtros e preserva a opção todas as regiões", async () => {
+  const key = "vale-serra-mar:preferences:v2";
+  await AsyncStorage.setItem(
+    key,
+    JSON.stringify({
+      region: "Vale do Paraíba",
+      city: "Caçapava",
+      interests: ["Restaurantes"],
+      favorites: ["favorito"],
+      recent: ["sushi"],
+    }),
+  );
+  let store!: ReturnType<typeof useStore>;
+  let tree!: ReactTestRenderer;
+  function Probe() {
+    store = useStore();
+    return null;
+  }
+  async function reopen() {
+    await act(async () => {
+      tree = create(
+        React.createElement(StoreProvider, null, React.createElement(Probe)),
+      );
+    });
+  }
+  await reopen();
+  expect(catalogFiltersFor(store.state)).toMatchObject({
+    city: "Caçapava",
+    region: "Vale do Paraíba",
+  });
+  const selection = {
+    city: "Ilhabela",
+    region: "Litoral Norte",
+    query: "porto",
+    segment: "Restaurante",
+    district: "Saco",
+    openNow: true,
+    menu: true,
+    reservations: true,
+  };
+  await act(async () => store.setCatalogFilters(selection));
+  await act(async () => tree.unmount());
+  await reopen();
+  expect(catalogFiltersFor(store.state)).toEqual(selection);
+  expect(store.state.favorites).toEqual(["favorito"]);
+  await act(async () => store.setCatalogFilters({ city: "", region: "" }));
+  await act(async () => tree.unmount());
+  await reopen();
+  expect(catalogFiltersFor(store.state)).toEqual({
+    ...selection,
+    region: "",
+    city: "",
+  });
+  expect(store.state.city).toBe("Caçapava");
+  await act(async () => tree.unmount());
+  await AsyncStorage.removeItem(key);
 });
 it("não cria conta nem reserva quando o servidor falha", async () => {
   let store!: ReturnType<typeof useStore>;

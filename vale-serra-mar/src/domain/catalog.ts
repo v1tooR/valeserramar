@@ -1,5 +1,5 @@
 import { assets } from "../assets";
-import type { Business, Hours, Product, Segment, State } from "./models";
+import type { Business, CatalogFilters, Hours, Segment, State } from "./models";
 export const regions = [
   {
     name: "Vale do Paraíba",
@@ -29,8 +29,37 @@ export const regions = [
     photo: assets.landscape,
   },
 ];
+export const cityKey = (city: string) =>
+  city.normalize("NFD").replace(/[\u0300-\u036f\s]/g, "").toLowerCase();
+
+const regionByCity = new Map(
+  regions.flatMap(({ name, cities }) =>
+    cities.map((city) => [cityKey(city), name] as const),
+  ),
+);
+
 export function regionForCity(city: string) {
-  return regions.find((region) => region.cities.includes(city))?.name;
+  return regionByCity.get(cityKey(city));
+}
+
+export const emptyCatalogFilters: CatalogFilters = {
+  region: "",
+  city: "",
+  segment: "",
+  district: "",
+  openNow: false,
+  menu: false,
+  reservations: false,
+  query: "",
+};
+
+export function catalogFiltersFor({
+  catalogFilters,
+  city,
+  region,
+}: State): CatalogFilters {
+  if (catalogFilters) return catalogFilters;
+  return { ...emptyCatalogFilters, city, region: regionForCity(city) ?? region };
 }
 
 export const segments: Segment[] = [
@@ -85,6 +114,7 @@ export const initialState: State = {
   schema: 1,
   region: "",
   city: "",
+  catalogFilters: null,
   interests: [],
   favorites: [],
   recent: [],

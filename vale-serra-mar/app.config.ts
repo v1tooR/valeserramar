@@ -9,13 +9,14 @@ const config: ExpoConfig = {
       projectId: "b1199a5a-fb4f-4903-a1e8-c51618547354",
     },
   },
-  version: "0.2.0",
+  version: "0.2.2",
   icon: "./assets/app-icon.png",
   orientation: "portrait",
   userInterfaceStyle: "light",
   scheme: "valeserramar",
   android: {
     package: "br.com.valeserramar.guia",
+    versionCode: 3,
     adaptiveIcon: {
       foregroundImage: "./assets/app-icon-foreground.png",
       backgroundColor: "#08392F",

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { row, rows, transaction } from "./db.js";
+import { checkGalleryLimit } from "./media.js";
 import { fail, hash, parse, session } from "./security.js";
 import {
   businessInput,
@@ -20,6 +21,9 @@ export const businessView = (record, owner) => ({
   status: record.status,
   correction: owner ? record.correction : "",
   owner,
+  highlights: record.home_highlight || record.explore_highlight
+    ? { home: record.home_highlight ?? null, explore: record.explore_highlight ?? null }
+    : undefined,
 });
 const productView = (record) => ({
   ...record.data,
@@ -30,7 +34,7 @@ const productView = (record) => ({
 export async function owned(db, id, accountId, lock = false) {
   const business = await row(
     db,
-    "SELECT * FROM vsm.businesses WHERE id=$1 AND owner_id=$2" +
+    "SELECT * FROM vsm.businesses WHERE id=$1 AND owner_id=$2 AND deleted_at IS NULL" +
       (lock ? " FOR UPDATE" : ""),
     [requireId(id), accountId],
   );
@@ -103,11 +107,11 @@ export function catalogRoutes(app, db, origin) {
   app.get("/catalog", async () => {
     const businesses = await rows(
       db,
-      "SELECT * FROM vsm.businesses WHERE status='Aprovado' ORDER BY id",
+      "SELECT * FROM vsm.businesses WHERE status='Aprovado' AND deleted_at IS NULL ORDER BY id",
     );
     const products = await rows(
       db,
-      "SELECT p.* FROM vsm.products p JOIN vsm.businesses b ON b.id=p.business_id WHERE b.status='Aprovado' AND p.data->>'available'='true' ORDER BY p.id",
+      "SELECT p.* FROM vsm.products p JOIN vsm.businesses b ON b.id=p.business_id WHERE b.status='Aprovado' AND b.deleted_at IS NULL AND p.data->>'available'='true' ORDER BY p.id",
     );
     return {
       businesses: businesses.map((b) => businessView(b, false)),
@@ -118,17 +122,17 @@ export function catalogRoutes(app, db, origin) {
     const { accountId } = await session(db, req);
     const businesses = await rows(
       db,
-      "SELECT * FROM vsm.businesses WHERE owner_id=$1 ORDER BY id",
+      "SELECT * FROM vsm.businesses WHERE owner_id=$1 AND deleted_at IS NULL ORDER BY id",
       [accountId],
     );
     const products = await rows(
       db,
-      "SELECT p.* FROM vsm.products p JOIN vsm.businesses b ON b.id=p.business_id WHERE b.owner_id=$1 ORDER BY p.id",
+      "SELECT p.* FROM vsm.products p JOIN vsm.businesses b ON b.id=p.business_id WHERE b.owner_id=$1 AND b.deleted_at IS NULL ORDER BY p.id",
       [accountId],
     );
     const reservations = await rows(
       db,
-      "SELECT r.data FROM vsm.bookings r JOIN vsm.businesses b ON b.id=r.business_id WHERE b.owner_id=$1 ORDER BY r.created_at DESC",
+      "SELECT r.data FROM vsm.bookings r JOIN vsm.businesses b ON b.id=r.business_id WHERE b.owner_id=$1 AND b.deleted_at IS NULL ORDER BY r.created_at DESC",
       [accountId],
     );
     return {
@@ -151,9 +155,16 @@ export function catalogRoutes(app, db, origin) {
         const b = await owned(client, req.params.id, accountId, true);
         if (["Em análise", "Desativado"].includes(b.status))
           fail(409, "O anúncio não pode ser editado neste estado.");
+        checkGalleryLimit(data.gallery, b.data.gallery ?? []);
         await checkImages(client, images, accountId, origin);
-        if (data.subcategory === undefined && data.segment === b.data.segment)
-          data.subcategory = b.data.subcategory;
+        if (data.segment === b.data.segment) {
+          if (data.subcategory === undefined && !data.serviceType)
+            data.subcategory = b.data.subcategory;
+          if (data.lodgingType === undefined)
+            data.lodgingType = b.data.lodgingType;
+          if (data.serviceType === undefined && !data.subcategory)
+            data.serviceType = b.data.serviceType;
+        }
         const changed = await row(
           client,
           "UPDATE vsm.businesses SET data=$2, status=CASE WHEN status='Aprovado' THEN 'Rascunho' ELSE status END WHERE id=$1 RETURNING *",
@@ -167,6 +178,7 @@ export function catalogRoutes(app, db, origin) {
       accountId + ":business",
       data,
       async (client) => {
+        checkGalleryLimit(data.gallery);
         await checkImages(client, images, accountId, origin);
         return businessView(
           await row(

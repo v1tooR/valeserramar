@@ -19,6 +19,7 @@ export function BusinessCard({
   const nav = useNav(),
     { state, update } = useStore();
   const saved = state.favorites.includes(b.id);
+  const open = isOpen(b);
   return (
     <View style={[s.card, { padding: 10 }, compact && { width: 170 }]}>
       <Pressable
@@ -40,8 +41,8 @@ export function BusinessCard({
           <Text style={s.muted}>
             {b.district} · {b.city}
           </Text>
-          <Text style={{ fontSize: 11, color: isOpen(b) ? c.green : c.amber }}>
-            {isOpen(b) ? "● Aberto agora" : "● Confira os horários"}
+          <Text style={{ fontSize: 11, color: open ? c.green : c.amber }}>
+            {open ? "● Aberto agora" : "● Confira os horários"}
             {isRestaurant(b.segment) ? " · Cardápio" : ""}
           </Text>
         </View>

@@ -6,7 +6,8 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import rateLimit from "@fastify/rate-limit";
-import sharp from "sharp";
+import { maxImageBytes, saveWebp } from "./media.js";
+import { adminRoutes } from "./admin/routes.js";
 import { row, transaction } from "./db.js";
 import { bookingRoutes } from "./bookings.js";
 import { catalogRoutes, requireId } from "./catalog.js";
@@ -33,6 +34,7 @@ export async function createApp({
   webOrigins = [],
   logger = false,
   trustProxy = false,
+  admin,
 }) {
   const app = Fastify({
     logger,
@@ -53,7 +55,7 @@ export async function createApp({
   });
   await app.register(rateLimit, { max: 240, timeWindow: "1 minute" });
   await app.register(multipart, {
-    limits: { fileSize: 8 * 1024 * 1024, files: 1, fields: 0, parts: 2 },
+    limits: { fileSize: maxImageBytes, files: 1, fields: 0, parts: 2 },
   });
   await mkdir(mediaDir, { recursive: true });
   app.setErrorHandler((error, req, reply) => {
@@ -133,7 +135,7 @@ export async function createApp({
       [accountId, name, email, phone],
     );
   });
-  app.post("/media", limit(20), async (req, reply) => {
+  app.post("/media", limit(30), async (req, reply) => {
     const { accountId } = await session(db, req);
     if (!req.isMultipart()) fail(422, "Envie uma imagem.");
     const file = await req.file();
@@ -141,28 +143,7 @@ export async function createApp({
     const input = await file.toBuffer();
     const id = randomUUID();
     const path = join(mediaDir, id + ".webp");
-    try {
-      const image = sharp(input, {
-        limitInputPixels: 40_000_000,
-        failOn: "error",
-      });
-      const metadata = await image.metadata();
-      if (!["jpeg", "png", "webp", "heif"].includes(metadata.format))
-        fail(422, "Formato de imagem indisponível.");
-      await image
-        .rotate()
-        .resize({
-          width: 1600,
-          height: 1600,
-          fit: "inside",
-          withoutEnlargement: true,
-        })
-        .webp({ quality: 82 })
-        .toFile(path);
-    } catch {
-      await unlink(path).catch(() => {});
-      fail(422, "Não foi possível ler a imagem. Tente JPG, PNG ou WebP.");
-    }
+    await saveWebp(input, path);
     try {
       await db.query("INSERT INTO vsm.media(id,owner_id) VALUES($1,$2)", [
         id,
@@ -187,5 +168,7 @@ export async function createApp({
   });
   catalogRoutes(app, db, origin);
   bookingRoutes(app, db);
+  if (admin?.email || admin?.passwordHash)
+    await app.register(adminRoutes, { prefix: "/admin", logLevel: "warn", db, origin, mediaDir, admin });
   return app;
 }

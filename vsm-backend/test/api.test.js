@@ -35,6 +35,7 @@ test("API com PostgreSQL: contrato, isolamento, aprovação, mídia e reservas",
     onError: console.error,
   });
   let db, app, started;
+  const clientClosures = [];
   try {
     await postgres.initialise();
     await postgres.start();
@@ -45,6 +46,8 @@ test("API com PostgreSQL: contrato, isolamento, aprovação, mídia e reservas",
       user: "postgres",
       password: "local-test",
     });
+    db.on("connect", client =>
+      clientClosures.push(new Promise(resolve => client.once("end", resolve))));
     await migrate(db);
     await migrate(db);
     app = await createApp({ db, origin: url, mediaDir: join(temp, "media") });
@@ -143,6 +146,8 @@ test("API com PostgreSQL: contrato, isolamento, aprovação, mídia e reservas",
     const media = await send("GET", new URL(photo).pathname);
     assert.equal(media.headers["content-type"], "image/webp");
     assert.equal((await sharp(media.rawPayload).metadata()).format, "webp");
+    const photos = await Promise.all(Array.from({ length: 21 }, () =>
+      send("POST", "/media", { token, body: upload(png), headers, status: 201 })));
 
     const data = {
       name: "Cadastro de teste",
@@ -159,7 +164,8 @@ test("API com PostgreSQL: contrato, isolamento, aprovação, mídia e reservas",
       latitude: null,
       longitude: null,
       photo,
-      gallery: [],
+      logo: photos[20].url,
+      gallery: photos.slice(0, 20).map(({ url }) => url),
       hours: Array.from({ length: 7 }, (_, i) => ({
         day: String(i),
         open: true,
@@ -182,6 +188,9 @@ test("API com PostgreSQL: contrato, isolamento, aprovação, mídia e reservas",
       body: data,
       status: 422,
     });
+    const oversized = { ...data, gallery: [...data.gallery, data.logo] };
+    const rejectedGallery = await send("POST", "/businesses", { token, body: oversized, status: 422 });
+    assert.match(rejectedGallery.message, /até 20 fotos/);
     const creates = await Promise.all(
       [1, 2].map(() =>
         send("POST", "/businesses", {
@@ -195,6 +204,15 @@ test("API com PostgreSQL: contrato, isolamento, aprovação, mídia e reservas",
     const b = businessSchema.parse(creates[0]);
     assert.equal(b.id, creates[1].id);
     assert.equal(b.status, "Rascunho");
+    assert.deepEqual(b.gallery, data.gallery);
+    await send("PATCH", "/businesses/" + b.id, { token, body: oversized, status: 422 });
+    const previousGallery = [...oversized.gallery, photo];
+    await db.query("UPDATE vsm.businesses SET data = jsonb_set(data, '{gallery}', $2::jsonb) WHERE id=$1",
+      [b.id, JSON.stringify(previousGallery)]);
+    const preserved = await send("PATCH", "/businesses/" + b.id, {
+      token, body: { ...data, gallery: previousGallery },
+    });
+    assert.deepEqual(preserved.gallery, previousGallery);
     await send("PATCH", `/businesses/${b.id}/table-reservations`, {
       token,
       body: { acceptsReservations: false },
@@ -203,6 +221,11 @@ test("API com PostgreSQL: contrato, isolamento, aprovação, mídia e reservas",
     await send("PATCH", `/businesses/${b.id}`, {
       token,
       body: { ...data, subcategory: "Estética e Beleza" },
+      status: 422,
+    });
+    await send("PATCH", `/businesses/${b.id}`, {
+      token,
+      body: { ...data, lodgingType: "Hotéis" },
       status: 422,
     });
     const classified = await send("PATCH", `/businesses/${b.id}`, {
@@ -391,16 +414,87 @@ test("API com PostgreSQL: contrato, isolamento, aprovação, mídia e reservas",
       guests: 2,
       photo: "",
     };
+    const hotelData = {
+      ...data, segment: "Hospedagem", rooms: [room],
+      city: "Monteiro Lobato", region: "Serra da Mantiqueira",
+    };
     const hotel = await send("POST", "/businesses", {
       token,
       status: 201,
-      body: { ...data, segment: "Hospedagem", rooms: [room] },
+      body: { ...hotelData, lodgingType: "Hotéis" },
     });
+    assert.equal(hotel.lodgingType, "Hotéis");
+    for (const lodgingType of ["Pousadas", "Airbnb", null, "Hotéis"]) {
+      const edited = await send("PATCH", `/businesses/${hotel.id}`, {
+        token,
+        body: { ...hotelData, lodgingType },
+      });
+      assert.equal(edited.lodgingType, lodgingType);
+    }
+    const legacyEdit = await send("PATCH", `/businesses/${hotel.id}`, {
+      token,
+      body: { ...hotelData, subcategory: null },
+    });
+    assert.equal(legacyEdit.lodgingType, "Hotéis");
+
+    const serviceData = { ...data, segment: "Serviços", acceptsReservations: false, city: "Paraibuna" };
+    const agencyType = "Agência de Publicidade";
+    await send("POST", "/businesses", {
+      token, status: 422, body: { ...data, serviceType: agencyType },
+    });
+    await send("POST", "/businesses", {
+      token, status: 422, body: { ...serviceData, region: "Litoral Norte" },
+    });
+    await send("POST", "/businesses", {
+      token, status: 422,
+      body: { ...serviceData, subcategory: "Estética e Beleza", serviceType: agencyType },
+    });
+    const agency = await send("POST", "/businesses", {
+      token, status: 201, body: { ...serviceData, serviceType: agencyType },
+    });
+    assert.equal(agency.serviceType, agencyType);
+    const previousClientEdit = await send("PATCH", "/businesses/" + agency.id, {
+      token, body: { ...serviceData, subcategory: null },
+    });
+    assert.equal(previousClientEdit.serviceType, agencyType);
+    const genericService = await send("PATCH", "/businesses/" + agency.id, {
+      token, body: { ...serviceData, serviceType: null },
+    });
+    assert.equal(genericService.serviceType, null);
+    await send("PATCH", "/businesses/" + agency.id, {
+      token, body: { ...serviceData, subcategory: "Estética e Beleza" },
+    });
+    const agencyAgain = await send("PATCH", "/businesses/" + agency.id, {
+      token, body: { ...serviceData, serviceType: agencyType },
+    });
+    assert.equal(agencyAgain.subcategory, undefined);
+    await send("POST", "/businesses/" + agency.id + "/submit", { token, body: {} });
+    await review("aprovar", agency.id);
+
     await send("POST", "/businesses/" + hotel.id + "/submit", {
       token,
       body: {},
     });
     await review("aprovar", hotel.id);
+    const publicCatalog = await send("GET", "/catalog");
+    const approved = catalogSchema.parse(publicCatalog).businesses;
+    assert.equal(approved.find(business => business.id === hotel.id)?.city, "Monteiro Lobato");
+    assert.equal(approved.find(business => business.id === agency.id)?.city, "Paraibuna");
+    assert.equal(
+      approved.find((business) => business.id === hotel.id)?.lodgingType,
+      "Hotéis",
+    );
+    const legacyCatalogSchema = catalogSchema.extend({
+      businesses: businessSchema.omit({ lodgingType: true, serviceType: true }).array(),
+    });
+    const legacy = legacyCatalogSchema.parse(publicCatalog).businesses;
+    assert.equal(
+      legacy.find((business) => business.id === hotel.id)?.segment,
+      "Hospedagem",
+    );
+    assert.equal(approved.find(business => business.id === agency.id)?.serviceType, agencyType);
+    assert.equal(legacy.find(business => business.id === agency.id)?.segment, "Serviços");
+
     const stay = {
       ...booking,
       businessId: hotel.id,
@@ -427,6 +521,7 @@ test("API com PostgreSQL: contrato, isolamento, aprovação, mídia e reservas",
   } finally {
     await app?.close();
     await db?.end();
+    await Promise.all(clientClosures);
     if (started) await postgres.stop();
     await rm(temp, { recursive: true, force: true });
   }

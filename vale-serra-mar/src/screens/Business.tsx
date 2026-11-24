@@ -13,7 +13,7 @@ import {
   money,
 } from "../domain/logic";
 import { businessType } from "../domain/categories";
-import { regionForCity } from "../domain/catalog";
+import { catalogFiltersFor } from "../domain/catalog";
 import { contact, directions, openExternal } from "../services/external";
 import { colors as c, styles as s } from "../theme";
 import {
@@ -30,28 +30,22 @@ import {
 import { BusinessCard } from "../components/BusinessCard";
 import { BusinessMap } from "../components/BusinessMap";
 import { locatedBusinesses } from "../maps/openStreetMap";
-import { emptyFilters } from "./Discover";
-export function MapScreen({ route }: ScreenProps) {
+export function MapScreen() {
   const { state } = useStore(),
     nav = useNav();
   const { height } = useWindowDimensions();
-  const filters = {
-    ...emptyFilters,
-    segment: route.params?.category || "",
-    ...route.params?.filters,
-  };
-  const region = route.params?.allRegions ? "" : regionForCity(filters.city) ?? state.region;
-  const businesses = filterBusinesses(
-    state.businesses,
-    filters,
-    route.params?.query || "",
-    region,
-  );
+  const filters = catalogFiltersFor(state);
+  const { city, region, query } = filters;
+  const businesses = filterBusinesses(state.businesses, filters, query, region);
   const located = locatedBusinesses(businesses);
   const [selectedId, setSelectedId] = useState("");
   const selected = located.find((b) => b.id === selectedId);
   return (
-    <Page title="Mapa de empresas" tab="Map">
+    <Page
+      title="Mapa de empresas"
+      subtitle={city || region || "Todas as regiões"}
+      tab="Map"
+    >
       <View
         style={{
           height: Math.max(230, Math.min(400, height * 0.42)),
@@ -62,15 +56,18 @@ export function MapScreen({ route }: ScreenProps) {
       >
         <BusinessMap
           businesses={located}
+          city={city}
           region={region}
           onSelect={(b) => setSelectedId(b.id)}
         />
       </View>
       <View style={s.between}>
-        <Text style={s.heading}>{located.length} lugares no mapa</Text>
+        <Text style={s.heading}>
+          {located.length === 1 ? "1 lugar no mapa" : `${located.length} lugares no mapa`}
+        </Text>
         <Chip
           title="Ver lista"
-          onPress={() => nav.navigate("Results", route.params)}
+          onPress={() => nav.navigate("Results")}
         />
       </View>
       <CollectionState

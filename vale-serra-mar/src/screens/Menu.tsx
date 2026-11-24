@@ -228,7 +228,7 @@ export function ProductScreen({ route }: ScreenProps) {
   );
 }
 export function CartScreen() {
-  const { state, update } = useStore(),
+  const { state, update, setCatalogFilters } = useStore(),
     nav = useNav();
   const [delivery, setDelivery] = useState(false),
     [address, setAddress] = useState(""),
@@ -316,9 +316,10 @@ export function CartScreen() {
           <Notice>Seu pedido está vazio.</Notice>
           <Button
             title="Explorar restaurantes"
-            onPress={() =>
-              nav.navigate("Results", { category: "Alimentação" })
-            }
+            onPress={() => {
+              setCatalogFilters({ segment: "Alimentação", query: "" });
+              nav.navigate("Results");
+            }}
           />
         </>
       ) : (

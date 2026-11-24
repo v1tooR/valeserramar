@@ -20,13 +20,15 @@ export const diningSegments = [
   "Pizzarias",
   "Bares e noite",
 ];
-const subcategorySegments = {
+export const subcategorySegments = {
   Lanches: "Restaurantes",
   Doceria: "Cafeterias",
   Lanchonetes: "Restaurantes",
   Padaria: "Cafeterias",
   "Estética e Beleza": "Serviços",
 };
+export const advertisingAgency = "Agência de Publicidade";
+
 export const businessSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -38,6 +40,8 @@ export const businessSchema = z.object({
     "Comércio",
   ]),
   subcategory: z.enum(Object.keys(subcategorySegments)).nullish(),
+  lodgingType: z.enum(["Hotéis", "Pousadas", "Airbnb"]).nullish(),
+  serviceType: z.literal(advertisingAgency).nullish(),
   region: z.string(),
   city: z.string(),
   district: z.string(),
@@ -68,6 +72,10 @@ export const businessSchema = z.object({
   ]),
   correction: z.string(),
   owner: z.boolean(),
+  highlights: z.object({
+    home: z.number().int().min(1).max(15).nullable(),
+    explore: z.number().int().min(1).max(15).nullable(),
+  }).optional(),
 });
 export const productSchema = z.object({
   id: z.string(),
@@ -130,6 +138,7 @@ export const regions = [
       "São José dos Campos",
       "Aparecida",
       "Cunha",
+      "Paraibuna",
     ],
   },
   {
@@ -138,6 +147,7 @@ export const regions = [
       "Campos do Jordão",
       "Santo Antônio do Pinhal",
       "São Bento do Sapucaí",
+      "Monteiro Lobato",
     ],
   },
   {
@@ -154,7 +164,7 @@ export const tableReservationsInput = z.strictObject({
   acceptsReservations: z.boolean(),
 });
 export const businessInput = businessSchema
-  .omit({ id: true, owner: true, status: true, correction: true })
+  .omit({ id: true, owner: true, status: true, correction: true, highlights: true })
   .extend({
     photo: image,
     logo: image.optional(),
@@ -172,6 +182,8 @@ export const businessInput = businessSchema
   .refine(
     (b) => !b.subcategory || subcategorySegments[b.subcategory] === b.segment,
   )
+  .refine((b) => !b.lodgingType || b.segment === "Hospedagem")
+  .refine((b) => !b.serviceType || (b.segment === "Serviços" && !b.subcategory))
   .refine((b) =>
     regions.some((r) => r.name === b.region && r.cities.includes(b.city)),
   )

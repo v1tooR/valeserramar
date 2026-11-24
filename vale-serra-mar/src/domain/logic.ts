@@ -7,6 +7,7 @@ import type {
   Product,
 } from "./models";
 import { businessType, exploreCategories } from "./categories";
+import { cityKey, regionForCity } from "./catalog";
 export const money = (value: number) =>
   value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 export const normalize = (text: string) =>
@@ -66,14 +67,15 @@ export function phoneDigits(value: string) {
 export function validPhone(value: string) {
   return /^(?:55)?\d{10,11}$/.test(phoneDigits(value));
 }
+const businessClock = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Sao_Paulo",
+  weekday: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
 export function isOpen(business: Business, now = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Sao_Paulo",
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(now);
+  const parts = businessClock.formatToParts(now);
   const value = (type: string) =>
     parts.find((p) => p.type === type)?.value || "";
   const day = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(
@@ -106,7 +108,10 @@ export function highlightedBusinesses(
       return business.status === "Aprovado" &&
         typeof business.photo === "string" &&
         business.photo.trim() &&
-        slot != null
+        typeof slot === "number" &&
+        Number.isInteger(slot) &&
+        slot >= 1 &&
+        slot <= 15
         ? [{ business, slot }]
         : [];
     })
@@ -122,29 +127,38 @@ export function filterBusinesses(
   region: string,
   now = new Date(),
 ) {
-  const term = normalize(query);
+  const terms = normalize(query).split(/\s+/).filter(Boolean);
+  const district = normalize(filters.district);
+  const city = cityKey(filters.city);
+  const regionKey = normalize(region);
   const selectedCategory = exploreCategories.find(
     (category) => category === filters.segment,
   );
   return businesses.filter((b) => {
-    const type = businessType(b);
-    return (
-      b.status === "Aprovado" &&
-      (!region || b.region === region) &&
-      (!filters.city || b.city === filters.city) &&
-      (!filters.segment ||
-        (selectedCategory
-          ? type.category === selectedCategory
-          : b.segment === filters.segment || type.label === filters.segment)) &&
-      (!filters.district || b.district === filters.district) &&
-      (!filters.openNow || isOpen(b, now)) &&
-      (!filters.menu || isRestaurant(b.segment)) &&
-      (!filters.reservations || canReserve(b)) &&
-      (!term ||
-        normalize(
-          `${b.name} ${b.segment} ${type.label} ${type.category ?? ""} ${b.description} ${b.city}`,
-        ).includes(term))
-    );
+    if (
+      b.status !== "Aprovado" ||
+      (city && cityKey(b.city) !== city) ||
+      (regionKey && normalize(regionForCity(b.city) ?? b.region) !== regionKey) ||
+      (district && !normalize(b.district).includes(district)) ||
+      (filters.menu && !isRestaurant(b.segment)) ||
+      (filters.reservations && !canReserve(b))
+    )
+      return false;
+
+    if (filters.segment || terms.length) {
+      const type = businessType(b);
+      const matchesCategory = selectedCategory
+        ? type.category === selectedCategory
+        : b.segment === filters.segment || type.label === filters.segment;
+      if (filters.segment && !matchesCategory) return false;
+      if (terms.length) {
+        const searchable = normalize(
+          `${b.name} ${b.segment} ${type.label} ${type.category ?? ""} ${b.description} ${b.city} ${b.district}`,
+        );
+        if (!terms.every((term) => searchable.includes(term))) return false;
+      }
+    }
+    return !filters.openNow || isOpen(b, now);
   });
 }
 export function validateReservation(

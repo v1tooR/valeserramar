@@ -132,10 +132,15 @@ export interface Filters {
   menu: boolean;
   reservations: boolean;
 }
+export interface CatalogFilters extends Filters {
+  region: string;
+  query: string;
+}
 export interface State {
   schema: 1;
   region: string;
   city: string;
+  catalogFilters: CatalogFilters | null;
   interests: string[];
   favorites: string[];
   recent: string[];

@@ -19,6 +19,10 @@ const app = await createApp({
     .filter(Boolean),
   trustProxy: process.env.TRUST_PROXY === "1" ? 1 : false,
   logger: true,
+  admin: {
+    email: process.env.ADMIN_EMAIL?.trim().toLowerCase(),
+    passwordHash: process.env.ADMIN_PASSWORD_HASH?.trim(),
+  },
 });
 for (const signal of ["SIGTERM", "SIGINT"])
   process.once(signal, async () => {

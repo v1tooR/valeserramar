@@ -1,4 +1,3 @@
-import type { Filters } from "./domain/models";
 import { useNavigation } from "@react-navigation/native";
 import type {
   NativeStackNavigationProp,
@@ -50,11 +49,7 @@ export type Params =
       roomId?: string;
       step?: number;
       message?: string;
-      query?: string;
-      category?: string;
       preview?: boolean;
-      filters?: Filters;
-      allRegions?: boolean;
     }
   | undefined;
 export type Routes = { [K in ScreenName]: Params };

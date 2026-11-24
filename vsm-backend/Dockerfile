@@ -4,5 +4,6 @@ COPY package*.json ./
 RUN npm ci --omit=dev && mkdir /app/media && chown node:node /app/media
 COPY src ./src
 COPY sql ./sql
+RUN chmod -R a+rX /app/src /app/sql
 USER node
 CMD ["node", "src/index.js"]

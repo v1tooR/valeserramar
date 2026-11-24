@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: vsm_sandbox
+      POSTGRES_USER: vsm_sandbox
+      POSTGRES_PASSWORD: ${VSM_SANDBOX_DB_PASSWORD:?Configure a senha do banco de teste}
+    volumes:
+      - sandbox_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "vsm_sandbox", "-d", "vsm_sandbox"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  api:
+    build: .
+    command: ["node", "src/start-asaas-sandbox.js"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      HOST: 0.0.0.0
+      PORT: "3000"
+      PUBLIC_URL: ${ASAAS_SANDBOX_PUBLIC_URL:?Configure a URL publica do teste}
+      MEDIA_DIR: /app/media
+      DATABASE_URL: postgresql://vsm_sandbox:${VSM_SANDBOX_DB_PASSWORD:?Configure a senha do banco de teste}@db:5432/vsm_sandbox
+      ASAAS_SANDBOX_API_KEY: ${ASAAS_SANDBOX_API_KEY:?Configure a chave de API do Sandbox}
+      ASAAS_SANDBOX_TEST_EMAIL: ${ASAAS_SANDBOX_TEST_EMAIL:?Configure o e-mail de teste}
+    ports:
+      - "127.0.0.1:3101:3000"
+    volumes:
+      - sandbox_media:/app/media
+volumes:
+  sandbox_db:
+  sandbox_media:

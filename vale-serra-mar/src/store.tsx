@@ -7,9 +7,11 @@ import React, {
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Crypto from "expo-crypto";
-import { initialState } from "./domain/catalog";
+import { AppState } from "react-native";
+import { catalogFiltersFor, initialState, regionForCity } from "./domain/catalog";
 import type {
   Business,
+  CatalogFilters,
   Product,
   Reservation,
   Profile,
@@ -40,6 +42,7 @@ type Store = {
   loadError: string;
   refresh: () => Promise<void>;
   update: (fn: (s: State) => State) => void;
+  setCatalogFilters: (changes: Partial<CatalogFilters>) => void;
   authenticate: (
     mode: "login" | "register",
     data: { email: string; password: string; name?: string; phone?: string },
@@ -121,12 +124,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const guest = hasGuestSession() ? await repository.reservations() : [];
       if (version !== revision.current || requestId !== refreshId.current)
         return;
+      const publicById = new Map(catalog.businesses.map((b) => [b.id, b]));
       setState((s) => {
         const drafts = s.businesses.filter((b) => b.id.startsWith("draft-"));
         const all = merge(
           merge(
             catalog.businesses.map((b) => ({ ...b, owner: false })),
-            workspace?.businesses.map((b) => ({ ...b, owner: true })) || [],
+            workspace?.businesses.map((b) => ({
+              ...b,
+              owner: true,
+              highlights: publicById.get(b.id)?.highlights,
+            })) || [],
           ),
           drafts,
         );
@@ -162,11 +170,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           if (pref.success && alive) {
             const previousCity = "pindamonhangaba";
             const cityWasReplaced = pref.data.city.trim().toLowerCase() === previousCity;
+            const savedFilters = pref.data.catalogFilters;
             setState((s) => ({
               ...s,
               ...pref.data,
               city: cityWasReplaced ? "Aparecida" : pref.data.city,
               region: cityWasReplaced ? "Vale do Paraíba" : pref.data.region,
+              catalogFilters: savedFilters
+                ? {
+                    ...savedFilters,
+                    region: regionForCity(savedFilters.city) ?? savedFilters.region,
+                  }
+                : null,
               recent: pref.data.recent.filter(
                 (query) => !query.toLowerCase().includes(previousCity),
               ),
@@ -205,8 +220,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
   useEffect(() => {
     if (!ready) return;
-    const { region, city, interests, favorites, recent } = state;
-    const raw = JSON.stringify({ region, city, interests, favorites, recent });
+    const { region, city, interests, favorites, recent, catalogFilters } = state;
+    const raw = JSON.stringify({ region, city, interests, favorites, recent, catalogFilters });
     writes.current = writes.current
       .then(() => AsyncStorage.setItem(STORAGE_KEY, raw))
       .catch(() =>
@@ -220,8 +235,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     state.interests,
     state.favorites,
     state.recent,
+    state.catalogFilters,
     ready,
   ]);
+  useEffect(() => {
+    if (!ready) return;
+    let previous = AppState.currentState;
+    const subscription = AppState.addEventListener("change", (next) => {
+      if (previous !== "active" && next === "active") void refresh();
+      previous = next;
+    });
+    return () => subscription.remove();
+  }, [ready]);
   const saveDraft = (b: Business) =>
     setState((s) => ({
       ...s,
@@ -312,6 +337,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         loadError,
         refresh,
         update: setState,
+        setCatalogFilters: (changes) => setState((current) => ({
+          ...current,
+          catalogFilters: { ...catalogFiltersFor(current), ...changes },
+        })),
         saveDraft,
         saveBusiness,
         setTableReservations: async (id, acceptsReservations) => {

@@ -42,7 +42,7 @@ export function bookingRoutes(app, db) {
       async (client) => {
         const b = await row(
           client,
-          "SELECT data FROM vsm.businesses WHERE id=$1 AND status='Aprovado' FOR SHARE",
+          "SELECT data FROM vsm.businesses WHERE id=$1 AND status='Aprovado' AND deleted_at IS NULL FOR SHARE",
           [data.businessId],
         );
         if (!b?.data.acceptsReservations) fail(422, "Reservas indisponíveis.");

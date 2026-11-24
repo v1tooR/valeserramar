@@ -36,12 +36,16 @@ export function createPool() {
 export async function migrate(db) {
   await transaction(db, async (client) => {
     await client.query("SELECT pg_advisory_xact_lock(55738401)");
-    await client.query(
-      await readFile(
-        new URL("../sql/001_initial.sql", import.meta.url),
-        "utf8",
-      ),
-    );
+    for (const migration of [
+      "001_initial.sql",
+      "002_admin.sql",
+      "003_admin_businesses.sql",
+      "005_business_highlights.sql",
+    ]) {
+      await client.query(
+        await readFile(new URL("../sql/" + migration, import.meta.url), "utf8"),
+      );
+    }
   });
 }
 

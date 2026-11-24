@@ -9,7 +9,8 @@
     "start": "node --env-file-if-exists=.env src/index.js",
     "migrate": "node --env-file-if-exists=.env src/migrate.js",
     "test": "node --test",
-    "review": "node --env-file-if-exists=.env src/review.js"
+    "review": "node --env-file-if-exists=.env src/review.js",
+    "admin:hash": "node src/admin/hash-password.js"
   },
   "dependencies": {
     "@fastify/cors": "^11",
