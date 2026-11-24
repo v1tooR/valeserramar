@@ -1,4 +1,5 @@
 import { afterAll, beforeEach, expect, it, jest } from "@jest/globals";
+import { emptyBusiness } from "../src/domain/catalog";
 jest.mock("expo-secure-store", () => ({
   getItemAsync: jest.fn<() => Promise<null>>().mockResolvedValue(null),
   setItemAsync: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
@@ -12,21 +13,15 @@ beforeEach(() => {
   fetchMock.mockReset();
 });
 afterAll(() => fetchMock.mockRestore());
-it.each([
-  ["https://api.valeserraemar.com.br/", "1", false],
-  ["https://sandbox.example.test", "1", true],
-  ["https://sandbox.example.test", "0", false],
-])("usa a configuração de assinatura correta para %s com modo %s", (url, mode, expected) => {
-  const previous = process.env;
-  try {
-    process.env = { ...previous, EXPO_PUBLIC_API_URL: url, EXPO_PUBLIC_ASAAS_SANDBOX: mode };
-    jest.isolateModules(() => {
-      const { asaasSandboxEnabled } = require("../src/api/client") as typeof import("../src/api/client");
-      expect(asaasSandboxEnabled).toBe(expected);
-    });
-  } finally {
-    process.env = previous;
-  }
+it("envia o cadastro sem a seleção local de plano ou destaque", async () => {
+  const { repository } = require("../src/api/repository") as typeof import("../src/api/repository");
+  const business = emptyBusiness("draft-test");
+  fetchMock.mockResolvedValue({ ok: true, status: 201, json: async () => ({ ...business, id: "server-id" }) } as Response);
+  await repository.saveBusiness({ ...business, draftPlan: { planId: "annual", highlights: ["home"] } }, true);
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  const [url, options] = fetchMock.mock.calls[0];
+  expect(url).toBe("https://api.invalid/businesses");
+  expect(JSON.parse(String(options?.body))).not.toHaveProperty("draftPlan");
 });
 it("envia JSON e token recebido do servidor", async () => {
   await setAccessToken("session");

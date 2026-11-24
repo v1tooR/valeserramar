@@ -1,4 +1,5 @@
 import type { BusinessSubcategory, LodgingType, ServiceType } from "./categories";
+import type { AdvertiserPlanSelection } from "./advertiserPlans";
 
 export type Segment =
   | "Restaurantes"
@@ -52,6 +53,7 @@ export interface Room {
 export type HighlightPlacement = "home" | "explore";
 
 export interface Business {
+  draftPlan?: AdvertiserPlanSelection;
   id: string;
   name: string;
   segment: Segment;

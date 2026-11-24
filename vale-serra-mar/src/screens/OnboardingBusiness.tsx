@@ -3,11 +3,11 @@ import { Tap as Pressable } from "../components/Motion";
 import React, { useState } from "react";
 import { Image, Text, View } from "react-native";
 import { assets, photoSource } from "../assets";
-import { emptyBusiness, regions } from "../domain/catalog";
+import { regions } from "../domain/catalog";
 import { businessType, businessTypes } from "../domain/categories";
 import { isRestaurant, money, validPhone, validTime } from "../domain/logic";
 import type { Business } from "../domain/models";
-import { uid, useStore } from "../store";
+import { useStore } from "../store";
 import { useNav, type ScreenProps } from "../navigation";
 import { colors as c, styles as s } from "../theme";
 import {
@@ -23,19 +23,26 @@ import {
   Toggle,
 } from "../components/ui";
 import { pickPhoto } from "../services/photos";
+import { AdvertiserPlanTotals } from "./AdvertiserPlans";
 export function AdvertiseScreen() {
   const nav = useNav();
   const { state } = useStore();
+  function startRegistration() {
+    if (state.authenticated) {
+      nav.navigate("BusinessWelcome");
+    } else {
+      nav.navigate("Auth", { startBusinessRegistration: true });
+    }
+  }
   return (
     <Page
       title="Anuncie no guia"
+      onAdvertisePress={startRegistration}
       footer={
         <Button
           title="Quero anunciar meu negócio"
           icon="arrow-right"
-          onPress={() =>
-            nav.navigate(state.authenticated ? "Activate" : "Auth")
-          }
+          onPress={startRegistration}
         />
       }
     >
@@ -56,29 +63,28 @@ export function AdvertiseScreen() {
         title="Cardápio digital"
         subtitle="Categorias, preços e fotos dos seus pratos"
         icon="book-open"
-        onPress={() => nav.navigate("Auth")}
+        onPress={startRegistration}
       />
       <Row
         title="Solicitações de reserva"
         subtitle="Confirme mesas e hospedagens manualmente"
         icon="calendar"
-        onPress={() => nav.navigate("Auth")}
+        onPress={startRegistration}
       />
       <Row
         title="Indicadores básicos"
         subtitle="Visualizações e solicitações recebidas"
         icon="bar-chart-2"
-        onPress={() => nav.navigate("Auth")}
+        onPress={startRegistration}
       />
       <Notice>
-        Participação sujeita à análise da plataforma. Plano e valores de
-        assinatura serão definidos pelo contratante.
+        Escolha um plano de lançamento antes de preencher o cadastro do seu estabelecimento.
       </Notice>
     </Page>
   );
 }
-export function AuthScreen() {
-  const { authenticate } = useStore(),
+export function AuthScreen({ route }: { route?: ScreenProps["route"] }) {
+  const { authenticate, state } = useStore(),
     nav = useNav();
   const [create, setCreate] = useState(false),
     [name, setName] = useState(""),
@@ -105,7 +111,9 @@ export function AuthScreen() {
       password,
       ...(create ? { name: name.trim(), phone } : {}),
     });
-    nav.replace("Dashboard");
+    nav.replace(
+      route?.params?.startBusinessRegistration ? "BusinessWelcome" : "Dashboard",
+    );
   };
   return (
     <Page title="Área do anunciante" keyboardAware>
@@ -178,7 +186,7 @@ export function AuthScreen() {
       <Button
         secondary
         title="Continuar explorando"
-        onPress={() => nav.navigate("Home")}
+        onPress={() => (state.region ? nav.navigate("Home") : nav.popTo("Welcome"))}
       />
     </Page>
   );
@@ -233,53 +241,6 @@ export function ActivateScreen() {
         onChangeText={setPhone}
         keyboardType="phone-pad"
       />
-    </Page>
-  );
-}
-export function BusinessWelcomeScreen() {
-  const nav = useNav(),
-    { saveDraft, state } = useStore();
-  return (
-    <Page
-      title="Seu negócio no guia"
-      footer={
-        <Button
-          title="Começar cadastro"
-          onPress={() => {
-            const business = {
-              ...emptyBusiness(`draft-${uid()}`),
-              phone: state.profile?.phone || "",
-              region: state.region || regions[0].name,
-              city: state.city || "Caçapava",
-            };
-            saveDraft(business);
-            nav.replace("BusinessWizard", { businessId: business.id, step: 0 });
-          }}
-        />
-      }
-    >
-      <Text style={s.eyebrow}>Olá, {state.profile?.name.split(" ")[0]}</Text>
-      <Text style={s.title}>Vamos colocar seu{"\n"}negócio no guia</Text>
-      <Text style={s.muted}>
-        São 6 etapas. Confira cada informação antes de enviar seu cadastro.
-      </Text>
-      {[
-        "Dados do estabelecimento",
-        "Localização e contatos",
-        "Funcionamento",
-        "Fotos",
-        "Cardápio ou acomodações",
-        "Prévia e envio",
-      ].map((title, i) => (
-        <View key={title} style={s.row}>
-          <Badge text={String(i + 1)} />
-          <Text style={s.body}>{title}</Text>
-        </View>
-      ))}
-      <Notice tone="blue">
-        Seu anúncio será publicado após análise e conforme as regras comerciais
-        da plataforma.
-      </Notice>
     </Page>
   );
 }
@@ -814,6 +775,7 @@ export function BusinessWizardScreen({ route }: ScreenProps) {
           <Text style={s.muted}>
             {b.address}, {b.number} · {b.city}
           </Text>
+          {b.draftPlan && <AdvertiserPlanTotals selection={b.draftPlan} />}
           <Button
             secondary
             title="Ver como visitante"

@@ -5,6 +5,7 @@ import React, { useMemo, useState } from "react";
 import {
   Image,
   ImageBackground,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -56,6 +57,8 @@ export function WelcomeScreen() {
   const [region, setRegion] = useState(state.region || regions[0].name);
   return (
     <Page
+      title="Escolha sua região"
+      back={false}
       scroll={false}
       footer={
         <>
@@ -77,54 +80,65 @@ export function WelcomeScreen() {
         </>
       }
     >
-      <View style={{ flex: 1, minHeight: 0, paddingHorizontal: 20, paddingVertical: 8, gap: 10 }}>
-      <View style={{ flex: 1, minHeight: 0, maxHeight: 170 }}>
-      <Image
-        source={assets.logoFull}
-        style={{ width: "100%", height: "100%" }}
-        resizeMode="contain"
-      />
-      </View>
-      <Text style={[s.title, { textAlign: "center", fontSize: 24, lineHeight: 28 }]}>
-        Descubra o melhor{"\n"}da nossa região
-      </Text>
-      <Text style={[s.muted, { textAlign: "center" }]}>
-        Restaurantes, hospedagens e serviços do Vale, da Serra e do Mar em um só
-        lugar.
-      </Text>
-      <Text style={{ fontSize: 17, lineHeight: 22, fontWeight: "700", color: c.dark }}>Qual região vamos explorar?</Text>
-      {regions.map((r) => (
-        <Pressable
-          key={r.name}
-          accessibilityRole="radio"
-          accessibilityState={{ selected: region === r.name }}
-          onPress={() => setRegion(r.name)}
-          style={[
-            s.card,
-            s.row,
-            {
-              padding: 10,
-              borderColor: region === r.name ? c.green : c.border,
-              backgroundColor: region === r.name ? c.soft : c.white,
-            },
-          ]}
-        >
+      <ScrollView
+        style={{ flex: 1 }}
+        bounces={false}
+        overScrollMode="never"
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingHorizontal: 20,
+          paddingVertical: 10,
+          gap: 10,
+        }}
+      >
+        <View style={{ flex: 1, minHeight: 78, maxHeight: 170 }}>
           <Image
-            source={welcomePhotos[r.name]}
-            style={{ width: 58, height: 58, borderRadius: 12, flexShrink: 0 }}
-            resizeMode="cover"
+            source={assets.logoFull}
+            style={{ width: "100%", height: "100%" }}
+            resizeMode="contain"
           />
-          <View style={s.grow}>
-            <Text style={[s.body, { fontWeight: "700" }]}>{r.name}</Text>
-            <Text numberOfLines={2} style={[s.muted, { fontSize: 12, lineHeight: 16 }]}>{r.cities.slice(0, 3).join(", ")}</Text>
-          </View>
-          <Icon
-            name={region === r.name ? "check-circle" : "circle"}
-            size={21}
-          />
-        </Pressable>
-      ))}
-      </View>
+        </View>
+        <Text style={[s.title, { textAlign: "center", fontSize: 24, lineHeight: 28 }]}>
+          Descubra o melhor{"\n"}da nossa região
+        </Text>
+        <Text style={[s.muted, { textAlign: "center" }]}>
+          Restaurantes, hospedagens e serviços do Vale, da Serra e do Mar em um só
+          lugar.
+        </Text>
+        {regions.map((r) => (
+          <Pressable
+            key={r.name}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: region === r.name }}
+            onPress={() => setRegion(r.name)}
+            style={[
+              s.card,
+              s.row,
+              {
+                padding: 10,
+                borderColor: region === r.name ? c.green : c.border,
+                backgroundColor: region === r.name ? c.soft : c.white,
+              },
+            ]}
+          >
+            <Image
+              source={welcomePhotos[r.name]}
+              style={{ width: 58, height: 58, borderRadius: 12, flexShrink: 0 }}
+              resizeMode="cover"
+            />
+            <View style={s.grow}>
+              <Text style={[s.body, { fontWeight: "700" }]}>{r.name}</Text>
+              <Text numberOfLines={2} style={[s.muted, { fontSize: 12, lineHeight: 16 }]}>
+                {r.cities.slice(0, 3).join(", ")}
+              </Text>
+            </View>
+            <Icon
+              name={region === r.name ? "check-circle" : "circle"}
+              size={21}
+            />
+          </Pressable>
+        ))}
+      </ScrollView>
     </Page>
   );
 }
@@ -893,22 +907,6 @@ export function ProfileScreen() {
         icon="map-pin"
         onPress={() => nav.navigate("Preferences")}
       />
-      <View style={[s.card, { backgroundColor: c.green }]}>
-        <Text style={[s.heading, { color: c.white }]}>
-          Tem um negócio{"\n"}na região?
-        </Text>
-        <Text style={{ color: c.white }}>
-          Apareça para quem explora a região e receba solicitações de reservas.
-        </Text>
-        <Button
-          secondary
-          title="Anunciar meu negócio"
-          icon="briefcase"
-          onPress={() =>
-            nav.navigate(state.authenticated ? "Activate" : "Advertise")
-          }
-        />
-      </View>
       {state.authenticated && (
         <Row
           title="Área do anunciante"

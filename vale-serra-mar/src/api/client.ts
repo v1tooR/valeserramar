@@ -10,15 +10,9 @@ export class ApiError extends Error {
   }
 }
 const base = (process.env.EXPO_PUBLIC_API_URL || "").trim().replace(/\/+$/, "");
-const officialApi = /^https?:\/\/api\.valeserraemar\.com\.br(?:[/:]|$)/i;
 export const apiConfigured = Boolean(base);
-export const asaasSandboxEnabled =
-  apiConfigured &&
-  !officialApi.test(base) &&
-  process.env.EXPO_PUBLIC_ASAAS_SANDBOX === "1";
-const storagePrefix = asaasSandboxEnabled ? "vsm.asaas-sandbox." : "vsm.";
-const accessKey = storagePrefix + "access";
-const guestKey = storagePrefix + "guest";
+const accessKey = "vsm.access";
+const guestKey = "vsm.guest";
 let accessToken = "";
 let guestToken = "";
 let onUnauthorized = () => {};

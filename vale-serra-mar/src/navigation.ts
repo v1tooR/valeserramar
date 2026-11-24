@@ -1,4 +1,5 @@
 import { useNavigation } from "@react-navigation/native";
+import type { AdvertiserPlanId } from "./domain/advertiserPlans";
 import type {
   NativeStackNavigationProp,
   NativeStackScreenProps,
@@ -26,6 +27,7 @@ export type ScreenName =
   | "Auth"
   | "Activate"
   | "BusinessWelcome"
+  | "BusinessPlanReview"
   | "BusinessWizard"
   | "ReviewStatus"
   | "Dashboard"
@@ -50,6 +52,8 @@ export type Params =
       step?: number;
       message?: string;
       preview?: boolean;
+      advertiserPlanId?: AdvertiserPlanId;
+      startBusinessRegistration?: boolean;
     }
   | undefined;
 export type Routes = { [K in ScreenName]: Params };

@@ -81,7 +81,7 @@ export async function uploadPhoto(photo: Photo): Promise<string> {
   return result.url;
 }
 async function businessBody(b: Business) {
-  const { owner, status, correction, id, highlights, ...fields } = b;
+  const { owner, status, correction, id, highlights, draftPlan, ...fields } = b;
   return {
     ...fields,
     subcategory: b.subcategory ?? null,

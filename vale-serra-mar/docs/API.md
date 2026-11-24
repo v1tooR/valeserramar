@@ -77,13 +77,7 @@ A identidade anônima permanece no aparelho nativo. Recuperação após troca/pe
 
 A API deve calcular métricas a partir de eventos reais. Instrumentação e deduplicação de eventos de visualização/contato ainda precisam ser fechadas com o backend. Nenhum número é inventado pelo frontend.
 
-O checkout de teste está disponível ao iniciar o app com `EXPO_PUBLIC_ASAAS_SANDBOX=1` e apontá-lo para a API separada do Sandbox. Os preços e a periodicidade são definidos pelo servidor. A tela de teste abre o checkout do Asaas no navegador e atualiza o estado ao consultar a cobrança pelo ID do checkout.
-
-| Método e rota Sandbox | Resposta |
-| --- | --- |
-| GET /businesses/:id/asaas-sandbox | Planos com preços em centavos, ciclo e estado do checkout |
-| POST /businesses/:id/asaas-sandbox/:code/checkout | Estado e link para abrir no Asaas Sandbox |
-| POST /businesses/:id/asaas-sandbox/:code/status | Estado atualizado com base na resposta do Asaas Sandbox |
+Antes do cadastro, o app apresenta o plano escolhido e os valores dos destaques opcionais. A seleção fica no rascunho local e o envio do estabelecimento usa o contrato atual da API. A futura integração deve validar os IDs, preços e periodicidades no servidor antes de criar cobranças. O status da assinatura deve acompanhar a confirmação do pagamento pelo provedor.
 
 Na API normal, a tela de assinatura consulta o registro da participação do negócio. Pagamentos de produtos e reservas são tratados diretamente com o estabelecimento.
 

@@ -372,35 +372,37 @@ export function Stepper({
     </View>
   );
 }
-export function BrandHeader() {
+export function BrandHeader({ showLocation = true }: { showLocation?: boolean }) {
   const nav = useNav(),
     { state } = useStore();
   return (
-    <View style={[s.between, { paddingVertical: 8 }]}>
+    <View style={u.brand}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Ir para o início"
         onPress={() => nav.reset({ index: 0, routes: [{ name: "Home" }] })}
-        style={{ flexShrink: 1 }}
+        style={u.brandLogo}
       >
         <Image
           source={assets.logo}
-          style={{ width: 168, height: 54 }}
+          style={{ width: 128, height: 43 }}
           resizeMode="contain"
         />
       </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Alterar região"
-        style={u.location}
-        onPress={() => nav.navigate("Preferences")}
-      >
-        <Icon name="map-pin" size={13} />
-        <Text style={{ color: c.green, fontSize: 12, fontWeight: "600" }}>
-          {state.city || "Região"}
-        </Text>
-        <Icon name="chevron-down" size={13} />
-      </Pressable>
+      {showLocation && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Alterar região, ${state.city || "Região"}`}
+          style={u.location}
+          onPress={() => nav.navigate("Preferences")}
+        >
+          <Icon name="map-pin" size={13} />
+          <Text numberOfLines={1} style={u.locationText}>
+            {state.city || "Região"}
+          </Text>
+          <Icon name="chevron-down" size={13} />
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -464,10 +466,13 @@ export function Tabs({
     </SafeAreaView>
   );
 }
+export const AdvertiserRegistrationContext = React.createContext(false);
+
 export function Page({
   children,
   title,
   subtitle,
+  back = true,
   footer,
   tab,
   advertiser,
@@ -475,10 +480,12 @@ export function Page({
   right,
   scroll = true,
   keyboardAware = false,
+  onAdvertisePress,
 }: {
   children: React.ReactNode;
   title?: string;
   subtitle?: string;
+  back?: boolean;
   footer?: React.ReactNode;
   tab?: ScreenName;
   advertiser?: boolean;
@@ -486,10 +493,12 @@ export function Page({
   right?: React.ReactNode;
   scroll?: boolean;
   keyboardAware?: boolean;
+  onAdvertisePress?: () => void;
 }) {
   const nav = useNav(),
-    { storageError, loading, refresh } = useStore();
-  const formScroll = useRef<React.ComponentRef<typeof ScrollView>>(null);
+    { state, storageError, loading, refresh } = useStore();
+  const inRegistration = React.useContext(AdvertiserRegistrationContext);
+  const scrollView = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const formHeight = useRef(0);
   const androidForm = keyboardAware && Platform.OS === "android";
   const iosForm = keyboardAware && Platform.OS === "ios";
@@ -504,7 +513,7 @@ export function Page({
     formHeight.current = layout.height;
     if (!shrank || layout.height <= 0) return;
 
-    const viewport = formScroll.current;
+    const viewport = scrollView.current;
     const content = viewport?.getInnerViewRef();
     const field = TextInput.State.currentlyFocusedInput();
     if (!content || !field || !viewport) return;
@@ -516,54 +525,77 @@ export function Page({
     });
   }
 
-  const content = (
-    <Entrance style={{ padding: 20, gap: 20 }}>
-      {brand && <BrandHeader />}
-      {children}
-    </Entrance>
-  );
+  function openAdvertisement() {
+    if (onAdvertisePress) {
+      onAdvertisePress();
+    } else if (inRegistration) {
+      scrollView.current?.scrollTo({ y: 0, animated: false });
+    } else {
+      nav.navigate(state.authenticated ? "BusinessWelcome" : "Advertise");
+    }
+  }
+
   return (
     <SafeAreaView
       style={{ flex: 1, minHeight: 0, backgroundColor: c.white }}
       edges={tab && Platform.OS === "android" ? ["top"] : ["top", "bottom"]}
     >
-      <KeyboardAvoidingView
-        style={{ flex: 1, minHeight: 0 }}
-        behavior={keyboardBehavior}
-      >
-        {title && (
-          <View style={u.header}>
-            <IconButton
-              icon="chevron-left"
-              label="Voltar"
-              onPress={() =>
-                nav.canGoBack() ? nav.goBack() : nav.navigate("Home")
-              }
-            />
-            <View style={s.grow}>
-              <Text
-                style={{
-                  textAlign: "center",
-                  fontSize: 17,
-                  fontWeight: "700",
-                  color: c.dark,
-                }}
-              >
+      <View style={u.header}>
+        {title ? (
+          <>
+            {back && (
+              <IconButton
+                icon="chevron-left"
+                label="Voltar"
+                onPress={() =>
+                  nav.canGoBack() ? nav.goBack() : nav.navigate("Home")
+                }
+              />
+            )}
+            <View style={u.headerTitleBlock}>
+              <Text numberOfLines={2} style={u.headerTitle}>
                 {title}
               </Text>
               {subtitle && (
-                <Text style={[s.muted, { textAlign: "center", fontSize: 12 }]}>
+                <Text numberOfLines={2} style={u.headerSubtitle}>
                   {subtitle}
                 </Text>
               )}
             </View>
-            {right || <View style={{ width: 40 }} />}
-          </View>
+            {right}
+          </>
+        ) : brand || tab ? (
+          <BrandHeader showLocation={brand} />
+        ) : (
+          <View style={s.grow} />
         )}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Anunciar um estabelecimento"
+          accessibilityHint={
+            inRegistration && !onAdvertisePress
+              ? "Volta ao início desta etapa"
+              : undefined
+          }
+          onPress={openAdvertisement}
+          style={[u.advertise, inRegistration && u.advertiseCurrent]}
+        >
+          <View style={u.advertiseIcon}>
+            <Icon name="briefcase" size={15} color={c.yellow} />
+          </View>
+          <Text style={u.advertiseLabel} maxFontSizeMultiplier={1.4}>
+            Anunciar
+          </Text>
+        </Pressable>
+      </View>
+      <KeyboardAvoidingView
+        style={{ flex: 1, minHeight: 0 }}
+        behavior={keyboardBehavior}
+      >
         {!!storageError && <Notice tone="red">{storageError}</Notice>}
         {scroll ? (
           <ScrollView
-            ref={androidForm ? formScroll : undefined}
+            ref={scrollView}
             style={{ flex: 1, minHeight: 0 }}
             automaticallyAdjustKeyboardInsets={iosForm}
             onLayout={androidForm ? onFormLayout : undefined}
@@ -579,7 +611,7 @@ export function Page({
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ flexGrow: 1 }}
           >
-            {content}
+            <Entrance style={{ padding: 20, gap: 20 }}>{children}</Entrance>
           </ScrollView>
         ) : (
           <View style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
@@ -645,22 +677,71 @@ const u = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  brand: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: 8,
+    rowGap: 2,
+  },
+  brandLogo: { minHeight: 44, justifyContent: "center" },
   location: {
     flexDirection: "row",
-    gap: 3,
+    gap: 4,
     backgroundColor: c.mint,
     borderRadius: 20,
-    padding: 9,
-    maxWidth: 166,
+    minHeight: 30,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    maxWidth: "100%",
     alignItems: "center",
   },
+  locationText: {
+    color: c.green,
+    fontSize: 12,
+    fontWeight: "600",
+    flexShrink: 1,
+  },
   header: {
+    flexShrink: 0,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 7,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: c.border,
+    backgroundColor: c.white,
   },
+  headerTitleBlock: { flex: 1, minWidth: 0 },
+  headerTitle: { color: c.dark, fontSize: 16, fontWeight: "700" },
+  headerSubtitle: { color: c.muted, fontSize: 12, marginTop: 2 },
+  advertise: {
+    minHeight: 44,
+    flexShrink: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingLeft: 6,
+    paddingRight: 11,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E7B955",
+    backgroundColor: "#F9D780",
+  },
+  advertiseCurrent: { backgroundColor: c.yellow, borderColor: "#EBD6A6" },
+  advertiseIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    backgroundColor: c.dark,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  advertiseLabel: { fontSize: 13, color: c.dark, fontWeight: "700" },
   tabs: {
     flexShrink: 0,
     backgroundColor: c.white,

@@ -9,7 +9,12 @@ import { StatusBar } from "expo-status-bar";
 import { StoreProvider, useStore } from "./src/store";
 import { colors } from "./src/theme";
 import type { Routes, ScreenName, ScreenProps } from "./src/navigation";
-import { Button, Notice, Page } from "./src/components/ui";
+import {
+  AdvertiserRegistrationContext,
+  Button,
+  Notice,
+  Page,
+} from "./src/components/ui";
 import {
   WelcomeScreen,
   HomeScreen,
@@ -41,9 +46,9 @@ import {
   AdvertiseScreen,
   AuthScreen,
   ActivateScreen,
-  BusinessWelcomeScreen,
   BusinessWizardScreen,
 } from "./src/screens/OnboardingBusiness";
+import { AdvertiserPlansScreen, BusinessPlanReviewScreen } from "./src/screens/AdvertiserPlans";
 import {
   EditBusinessScreen,
   ManageMenuScreen,
@@ -83,7 +88,8 @@ const screens: Record<ScreenName, React.ComponentType<ScreenProps>> = {
   Advertise: AdvertiseScreen,
   Auth: AuthScreen,
   Activate: ActivateScreen,
-  BusinessWelcome: BusinessWelcomeScreen,
+  BusinessWelcome: AdvertiserPlansScreen,
+  BusinessPlanReview: BusinessPlanReviewScreen,
   BusinessWizard: BusinessWizardScreen,
   ReviewStatus: ReviewStatusScreen,
   Dashboard: DashboardScreen,
@@ -103,6 +109,7 @@ const screens: Record<ScreenName, React.ComponentType<ScreenProps>> = {
 const protectedScreens: ScreenName[] = [
   "Activate",
   "BusinessWelcome",
+  "BusinessPlanReview",
   "BusinessWizard",
   "ReviewStatus",
   "Dashboard",
@@ -122,6 +129,14 @@ const approvedOnly: ScreenName[] = [
   "RespondReservation",
   "Indicators",
 ];
+const advertiserRegistrationScreens = new Set<ScreenName>([
+  "Advertise",
+  "Auth",
+  "Activate",
+  "BusinessWelcome",
+  "BusinessPlanReview",
+  "BusinessWizard",
+]);
 function RoutedScreen(props: ScreenProps) {
   const { state } = useStore();
   const { route, navigation } = props;
@@ -141,7 +156,7 @@ function RoutedScreen(props: ScreenProps) {
     b &&
     protectedScreens.includes(route.name) &&
     !b.owner &&
-    !["Activate", "BusinessWelcome"].includes(route.name)
+    !["Activate", "BusinessWelcome", "BusinessPlanReview"].includes(route.name)
   )
     return (
       <Page title="Meu negócio">
@@ -162,7 +177,13 @@ function RoutedScreen(props: ScreenProps) {
       </Page>
     );
   const Component = screens[route.name];
-  return <Component {...props} />;
+  return (
+    <AdvertiserRegistrationContext.Provider
+      value={advertiserRegistrationScreens.has(route.name)}
+    >
+      <Component {...props} />
+    </AdvertiserRegistrationContext.Provider>
+  );
 }
 function Navigator() {
   const reducedMotion = useReducedMotion();

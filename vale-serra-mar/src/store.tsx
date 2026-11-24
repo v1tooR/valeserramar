@@ -20,7 +20,6 @@ import type {
 import {
   ApiError,
   apiConfigured,
-  asaasSandboxEnabled,
   ensureGuest,
   errorMessage,
   hasGuestSession,
@@ -30,9 +29,7 @@ import {
 } from "./api/client";
 import { repository } from "./api/repository";
 import { preferencesSchema } from "./api/schemas";
-const STORAGE_KEY = asaasSandboxEnabled
-  ? "vale-serra-mar:asaas-sandbox:preferences:v2"
-  : "vale-serra-mar:preferences:v2";
+const STORAGE_KEY = "vale-serra-mar:preferences:v2";
 export const uid = () => Crypto.randomUUID();
 type Store = {
   state: State;
@@ -127,8 +124,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const publicById = new Map(catalog.businesses.map((b) => [b.id, b]));
       setState((s) => {
         const drafts = s.businesses.filter((b) => b.id.startsWith("draft-"));
-        const all = merge(
-          merge(
+        const all = merge<Business>(
+          merge<Business>(
             catalog.businesses.map((b) => ({ ...b, owner: false })),
             workspace?.businesses.map((b) => ({
               ...b,

@@ -11,12 +11,13 @@ import {
 } from "react-native";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { HighlightCarousel } from "../src/components/HighlightCarousel";
-import { Chip, Field } from "../src/components/ui";
+import { AdvertiserRegistrationContext, Chip, Field, Page } from "../src/components/ui";
 import { AuthScreen } from "../src/screens/OnboardingBusiness";
 import { businesses } from "./fixtures";
 
 const mockScrollTo = jest.fn();
 const mockNavigate = jest.fn();
+let mockAuthenticated = false;
 const mockContent = {};
 let mockReducedMotion = false;
 let mockScreenFocused = true;
@@ -45,7 +46,9 @@ jest.mock("react-native-safe-area-context", () => ({
 jest.mock("../src/navigation", () => ({
   useNav: () => ({ navigate: mockNavigate }),
 }));
-jest.mock("../src/store", () => ({ useStore: () => ({}) }));
+jest.mock("../src/store", () => ({
+  useStore: () => ({ state: { authenticated: mockAuthenticated } }),
+}));
 jest.mock("../src/components/Motion", () => ({
   Entrance: ({ children }: React.PropsWithChildren) => children,
   Tap: ({ children }: React.PropsWithChildren) => children,
@@ -66,8 +69,38 @@ afterEach(async () => {
   jest.useRealTimers();
   mockScrollTo.mockClear();
   mockNavigate.mockClear();
+  mockAuthenticated = false;
   mockReducedMotion = false;
   mockScreenFocused = true;
+});
+
+it.each([
+  [false, "Advertise"],
+  [true, "BusinessWelcome"],
+])("mantém Anunciar fora da rolagem e encaminha para a etapa correta (sessão %s)", async (authenticated, screen) => {
+  mockAuthenticated = authenticated;
+  await act(async () => {
+    tree = create(React.createElement(Page, { title: "Mapa", children: "Mapa de empresas" }));
+  });
+  const shortcut = { accessibilityLabel: "Anunciar um estabelecimento" };
+  const root = tree!.root;
+  expect(root.findByType(ScrollView).findAllByProps(shortcut)).toHaveLength(0);
+  await act(async () => root.findByProps(shortcut).props.onPress());
+  expect(mockNavigate).toHaveBeenCalledWith(screen);
+});
+
+it("mantém a etapa atual ao tocar em Anunciar durante o cadastro", async () => {
+  await act(async () => {
+    tree = create(React.createElement(AdvertiserRegistrationContext.Provider, {
+      value: true,
+      children: React.createElement(Page, { title: "Cadastro", children: "Dados" }),
+    }));
+  });
+  await act(async () => tree!.root.findByProps({
+    accessibilityLabel: "Anunciar um estabelecimento",
+  }).props.onPress());
+  expect(mockScrollTo).toHaveBeenCalledWith({ y: 0, animated: false });
+  expect(mockNavigate).not.toHaveBeenCalled();
 });
 
 async function renderCarousel(count = businesses.length) {

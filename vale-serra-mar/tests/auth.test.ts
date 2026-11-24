@@ -2,13 +2,17 @@ import { expect, it, jest } from "@jest/globals";
 import React from "react";
 import { TextInput } from "react-native";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
-import { Chip, Icon } from "../src/components/ui";
+import { Button, Chip, Icon } from "../src/components/ui";
 import { AuthScreen } from "../src/screens/OnboardingBusiness";
 
+const mockAuthenticate = jest.fn();
+const mockReplace = jest.fn();
 jest.mock("../src/store", () => ({
-  useStore: () => ({ authenticate: jest.fn() }),
+  useStore: () => ({ authenticate: mockAuthenticate }),
 }));
-jest.mock("../src/navigation", () => ({ useNav: () => ({}) }));
+jest.mock("../src/navigation", () => ({
+  useNav: () => ({ replace: mockReplace }),
+}));
 jest.mock("../src/components/Motion", () => {
   const { Pressable, View } = jest.requireActual<typeof import("react-native")>(
     "react-native",
@@ -22,6 +26,28 @@ jest.mock("../src/components/ui", () => ({
   ),
   Page: ({ children }: React.PropsWithChildren) => children,
 }));
+
+it("depois de entrar pelo atalho de anúncio, segue para a escolha do plano", async () => {
+  let tree!: ReactTestRenderer;
+  await act(async () => {
+    tree = create(React.createElement(AuthScreen, {
+      route: { name: "Auth", key: "auth", params: { startBusinessRegistration: true } },
+    }));
+  });
+  try {
+    const [email, password] = tree.root.findAllByType(TextInput);
+    await act(async () => email.props.onChangeText("teste@example.com"));
+    await act(async () => password.props.onChangeText("senha-de-teste"));
+    const enter = tree.root.findAllByType(Button).find(({ props }) => props.title === "Entrar")!;
+    await act(async () => enter.props.onPress());
+    expect(mockAuthenticate).toHaveBeenCalledWith("login", {
+      email: "teste@example.com", password: "senha-de-teste",
+    });
+    expect(mockReplace).toHaveBeenCalledWith("BusinessWelcome");
+  } finally {
+    await act(async () => tree.unmount());
+  }
+});
 
 it("mostra e oculta a senha em Entrar e Criar conta, preservando o texto", async () => {
   let tree!: ReactTestRenderer;
