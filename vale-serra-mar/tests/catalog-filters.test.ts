@@ -5,8 +5,7 @@ import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { BusinessCard } from "../src/components/BusinessCard";
 import { BusinessMap } from "../src/components/BusinessMap";
 import { HighlightCarousel } from "../src/components/HighlightCarousel";
-import { HomeBannerCarousel } from "../src/components/HomeBannerCarousel";
-import { Button, Chip } from "../src/components/ui";
+import { Button, Chip, Page, Section } from "../src/components/ui";
 import {
   catalogFiltersFor,
   emptyBusiness,
@@ -244,17 +243,31 @@ it.each([HomeScreen, SearchScreen])(
   },
 );
 
-it.each([
-  [false, "Advertise"],
-  [true, "BusinessWelcome"],
-])("carrossel do início abre a lista e o anúncio na sessão %s", async (authenticated, route) => {
-  mockState.authenticated = authenticated;
+it("mostra as 15 vagas de cada área separadamente e posiciona os destaques antes das categorias no início", async () => {
+  const home = Array.from({ length: 15 }, (_, i) => ({
+    ...local,
+    id: `home-${i}`,
+    photo: "https://example.test/capa.png",
+    highlights: { home: i + 1, explore: null },
+  }));
+  const explore = home.map((item, i) => ({
+    ...item,
+    id: `explore-${i}`,
+    highlights: { home: null, explore: i + 1 },
+  }));
+  mockState.businesses = [...home, ...explore].reverse();
   const root = await render(React.createElement(HomeScreen));
-  const banner = root.findByType(HomeBannerCarousel);
-  await act(async () => banner.props.onDiscover());
-  expect(mockNavigate).toHaveBeenLastCalledWith("Results");
-  await act(async () => banner.props.onAdvertise());
-  expect(mockNavigate).toHaveBeenLastCalledWith(route);
+  expect(root.findByType(HighlightCarousel).props.businesses).toEqual(home);
+  const content = React.Children.toArray(root.findByType(Page).props.children);
+  const highlightIndex = content.findIndex(
+    (child) => React.isValidElement(child) && child.type === HighlightCarousel,
+  );
+  expect(content[highlightIndex + 1]).toMatchObject({
+    type: Section,
+    props: { title: "Categorias" },
+  });
+  await act(async () => tree!.update(React.createElement(SearchScreen)));
+  expect(tree!.root.findByType(HighlightCarousel).props.businesses).toEqual(explore);
 });
 
 it("aplica as preferências na seleção e oferece acesso direto à lista", async () => {

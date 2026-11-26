@@ -169,14 +169,18 @@ export function DashboardScreen() {
           />
         </View>
       )}
-      {isRestaurant(b.segment) && (
-        <Row
-          title="Cardápio"
-          subtitle="Categorias, itens e preços"
-          icon="book-open"
-          onPress={() => nav.navigate("ManageMenu")}
-        />
-      )}
+      <Row
+        title={isRestaurant(b.segment) ? "Cardápio" : "Produtos e serviços"}
+        subtitle="Categorias, itens e preços"
+        icon="book-open"
+        onPress={() => nav.navigate("ManageMenu", { businessId: b.id })}
+      />
+      <Row
+        title="Ofertas"
+        subtitle="Publique preços promocionais por tempo definido"
+        icon="tag"
+        onPress={() => nav.navigate("ManageOffers", { businessId: b.id })}
+      />
       {b.segment === "Hospedagem" && (
         <Row
           title="Acomodações"

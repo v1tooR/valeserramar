@@ -45,7 +45,6 @@ import {
 } from "../components/ui";
 import { BusinessCard } from "../components/BusinessCard";
 import { HighlightCarousel } from "../components/HighlightCarousel";
-import { HomeBannerCarousel } from "../components/HomeBannerCarousel";
 const welcomePhotos: Record<string, number> = {
   "Serra da Mantiqueira": require("../../assets/regiao-serra.png"),
   "Vale do Paraíba": require("../../assets/regiao-vale.png"),
@@ -261,10 +260,8 @@ export function HomeScreen() {
       Number(state.interests.includes(a.segment)),
   );
   const highlights = highlightedBusinesses(local, "home");
-  const startAdvertising = () =>
-    nav.navigate(state.authenticated ? "BusinessWelcome" : "Advertise");
   return (
-    <Page brand tab="Home" onAdvertisePress={startAdvertising}>
+    <Page brand tab="Home">
       <View>
         <Text style={s.eyebrow}>Guia regional · {state.region}</Text>
         <Text style={s.title}>Descubra {state.city}</Text>
@@ -274,21 +271,13 @@ export function HomeScreen() {
         icon="search"
         onPress={() => nav.navigate("Search")}
       />
-      <HomeBannerCarousel
-        region={state.region}
-        regionPhoto={
-          regions.find((r) => r.name === state.region)?.photo || assets.valley
-        }
-        onDiscover={() => nav.navigate("Results")}
-        onAdvertise={startAdvertising}
-      />
+      <HighlightCarousel businesses={highlights} />
       <Section
         title="Categorias"
         action="Ver todas"
         onPress={() => nav.navigate("Search")}
       />
       <HomeCategories />
-      <HighlightCarousel businesses={highlights} />
       <CollectionState empty={!sorted.length && !highlights.length} />
       {sorted.length > 0 && <Section title="Na sua cidade" />}
       {sorted.slice(0, 3).map((b) => (

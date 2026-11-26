@@ -1,5 +1,8 @@
 import { useNavigation } from "@react-navigation/native";
-import type { AdvertiserPlanId } from "./domain/advertiserPlans";
+import type {
+  AdvertiserPlanId,
+  AdvertiserPlanSelection,
+} from "./domain/advertiserPlans";
 import type {
   NativeStackNavigationProp,
   NativeStackScreenProps,
@@ -33,6 +36,7 @@ export type ScreenName =
   | "Dashboard"
   | "EditBusiness"
   | "ManageMenu"
+  | "ManageOffers"
   | "EditProduct"
   | "ManageRooms"
   | "EditRoom"
@@ -53,7 +57,7 @@ export type Params =
       message?: string;
       preview?: boolean;
       advertiserPlanId?: AdvertiserPlanId;
-      startBusinessRegistration?: boolean;
+      advertiserPlanSelection?: AdvertiserPlanSelection;
     }
   | undefined;
 export type Routes = { [K in ScreenName]: Params };

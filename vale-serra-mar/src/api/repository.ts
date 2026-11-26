@@ -1,6 +1,7 @@
 import { Platform } from "react-native";
 import type {
   Business,
+  OfferInput,
   Product,
   Profile,
   Reservation,
@@ -131,7 +132,7 @@ export const repository = {
       undefined,
     ),
   saveProduct: async (p: Product, creating: boolean) => {
-    const { id, ...data } = p;
+    const { id, offer, ...data } = p;
     return send(
       `/businesses/${encodeURIComponent(p.businessId)}/products${creating ? "" : `/${encodeURIComponent(id)}`}`,
       creating ? "POST" : "PATCH",
@@ -145,6 +146,14 @@ export const repository = {
       `/businesses/${encodeURIComponent(p.businessId)}/products/${encodeURIComponent(p.id)}`,
       { method: "DELETE" },
     ),
+  createOffers: async (businessId: string, data: OfferInput, key: string) =>
+    (await send(
+      `/businesses/${encodeURIComponent(businessId)}/offers`,
+      "POST",
+      data,
+      z.object({ products: z.array(productSchema) }),
+      key,
+    )).products,
   reserve: (r: Reservation) => {
     const { id, status, reply, createdAt, estimate, roomName, ...data } = r;
     return send("/reservations", "POST", data, reservationSchema, id);

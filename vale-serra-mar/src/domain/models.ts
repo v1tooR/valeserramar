@@ -41,6 +41,11 @@ export interface Product {
   photo: Photo;
   available: boolean;
   extras: Extra[];
+  offer?: { price: number; expiresAt: string };
+}
+export interface OfferInput {
+  durationHours: number;
+  products: { productId: string; priceCents: number }[];
 }
 export interface Room {
   id: string;

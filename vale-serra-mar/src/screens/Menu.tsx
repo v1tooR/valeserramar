@@ -4,9 +4,10 @@ import React, { useState } from "react";
 import { Image, Share, Text, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { photoSource } from "../assets";
+import { ProductPrice } from "../components/ProductPrice";
 import { useStore, uid } from "../store";
 import { useNav, type ScreenProps } from "../navigation";
-import { cartTotal, money, orderMessage, validateCart } from "../domain/logic";
+import { cartTotal, money, orderMessage, productPrice, validateCart } from "../domain/logic";
 import { contact } from "../services/external";
 import { colors as c, styles as s } from "../theme";
 import {
@@ -88,9 +89,9 @@ export function MenuScreen({ route }: ScreenProps) {
             <View style={s.grow}>
               <Text style={s.heading}>{p.name}</Text>
               <Text style={s.muted}>{p.description}</Text>
-              <Text style={[s.body, { fontWeight: "700", marginTop: 8 }]}>
-                {money(p.price)}
-              </Text>
+              <View style={{ marginTop: 8 }}>
+                <ProductPrice product={p} />
+              </View>
               {!p.available && (
                 <Text style={{ color: c.red }}>Indisponível no momento</Text>
               )}
@@ -132,7 +133,8 @@ export function ProductScreen({ route }: ScreenProps) {
       </Page>
     );
   const selected = p.extras.filter((e) => extras.includes(e.id)),
-    total = (p.price + selected.reduce((a, b) => a + b.price, 0)) * quantity;
+    price = productPrice(p),
+    total = (price + selected.reduce((a, b) => a + b.price, 0)) * quantity;
   const add = () => {
     const commit = (replace: boolean) => {
       update((s) => ({
@@ -144,7 +146,7 @@ export function ProductScreen({ route }: ScreenProps) {
             productId: p.id,
             businessId: p.businessId,
             name: p.name,
-            unitPrice: p.price,
+            unitPrice: price,
             quantity,
             extras: selected,
             notes,
@@ -179,9 +181,9 @@ export function ProductScreen({ route }: ScreenProps) {
         source={photoSource(p.photo)}
         style={{ width: "100%", height: 190, borderRadius: 16 }}
       />
-      <View style={s.between}>
-        <Text style={[s.heading, s.grow]}>{p.name}</Text>
-        <Text style={s.label}>{money(p.price)}</Text>
+      <View style={{ gap: 6 }}>
+        <Text style={s.heading}>{p.name}</Text>
+        <ProductPrice product={p} />
       </View>
       <Text style={s.muted}>{p.description}</Text>
       <Section title="Adicionais" />
@@ -376,6 +378,13 @@ export function OrderReviewScreen({ route }: ScreenProps) {
   const b = state.businesses.find((b) => b.id === route.params?.businessId),
     message = route.params?.message || "";
   const [busy, setBusy] = useState(false);
+  const cartError = validateCart(state.cart, state.products);
+  function canSend() {
+    const error = validateCart(state.cart, state.products);
+    if (!error) return true;
+    Alert.alert("Revise seu pedido", error);
+    return false;
+  }
   const record = () => {
     update((s) => ({
       ...s,
@@ -400,9 +409,10 @@ export function OrderReviewScreen({ route }: ScreenProps) {
         <Button
           title="Abrir WhatsApp"
           loading={busy}
+          disabled={!!cartError}
           icon="message-circle"
           onPress={async () => {
-            if (!b || busy) return;
+            if (!b || busy || !canSend()) return;
             setBusy(true);
             const opened = await contact(b, message);
             setBusy(false);
@@ -411,6 +421,7 @@ export function OrderReviewScreen({ route }: ScreenProps) {
         />
       }
     >
+      {!!cartError && <Notice tone="amber">{cartError}</Notice>}
       <Notice tone="blue">
         O WhatsApp será aberto com a mensagem preparada. Confirme o envio dentro
         do WhatsApp.
@@ -423,7 +434,9 @@ export function OrderReviewScreen({ route }: ScreenProps) {
       <Button
         secondary
         title="Copiar mensagem"
+        disabled={!!cartError}
         onPress={async () => {
+          if (!canSend()) return;
           await Clipboard.setStringAsync(message);
           Alert.alert("Copiado", "A mensagem está pronta para colar.");
         }}
@@ -431,7 +444,9 @@ export function OrderReviewScreen({ route }: ScreenProps) {
       <Button
         secondary
         title="Compartilhar mensagem"
+        disabled={!!cartError}
         onPress={() => {
+          if (!canSend()) return;
           Share.share({ message }).catch(() =>
             Alert.alert("Não foi possível compartilhar"),
           );

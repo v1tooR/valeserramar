@@ -11,8 +11,7 @@ import {
 } from "react-native";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { HighlightCarousel } from "../src/components/HighlightCarousel";
-import { HomeBannerCarousel } from "../src/components/HomeBannerCarousel";
-import { AdvertiserRegistrationContext, Chip, Field, Page } from "../src/components/ui";
+import { AdvertiserRegistrationContext, Field, Page } from "../src/components/ui";
 import { AuthScreen } from "../src/screens/OnboardingBusiness";
 import { businesses } from "./fixtures";
 
@@ -122,34 +121,6 @@ async function renderCarousel(count = businesses.length) {
   mockScrollTo.mockClear();
   return tree!.root;
 }
-
-it("abre com a lista no carrossel do início e permite ver o anúncio por toque ou deslize", async () => {
-  const discover = jest.fn();
-  const advertise = jest.fn();
-  await act(async () => {
-    tree = create(React.createElement(HomeBannerCarousel, {
-      region: "Vale do Paraíba",
-      regionPhoto: { uri: "https://example.test/regiao.jpg" },
-      onDiscover: discover,
-      onAdvertise: advertise,
-    }));
-  });
-  const root = tree!.root;
-  const viewport = root.findAllByType(View).find(({ props }) => props.onLayout)!;
-  await act(async () => viewport.props.onLayout(layout(280, 210)));
-  const list = root.findByProps({ accessibilityLabel: "Mostrar estabelecimentos" });
-  const ad = root.findByProps({ accessibilityLabel: "Mostrar anúncio" });
-  expect(list.props.accessibilityState.selected).toBe(true);
-  await act(async () => root.findByProps({ accessibilityLabel: "Ver estabelecimentos" }).props.onPress());
-  expect(discover).toHaveBeenCalledTimes(1);
-  await act(async () => ad.props.onPress());
-  expect(mockScrollTo).toHaveBeenLastCalledWith({ x: 280, animated: true });
-  expect(ad.props.accessibilityState.selected).toBe(true);
-  await act(async () => root.findByProps({ accessibilityLabel: "Quero anunciar meu negócio" }).props.onPress());
-  expect(advertise).toHaveBeenCalledTimes(1);
-  await act(async () => root.findByType(ScrollView).props.onScroll({ nativeEvent: { contentOffset: { x: 0, y: 0 } } }));
-  expect(list.props.accessibilityState.selected).toBe(true);
-});
 
 it("avança sozinho e permite voltar ou avançar nas duas extremidades", async () => {
   jest.useFakeTimers();
@@ -271,13 +242,15 @@ it("abre o cadastro com ajuste nativo de rolagem para o teclado no iOS", async (
 it("rola até o campo de e-mail em foco quando o teclado encolhe o formulário no Android", async () => {
   Object.defineProperty(Platform, "OS", { value: "android" });
   await act(async () => {
-    tree = create(React.createElement(AuthScreen));
+    tree = create(React.createElement(AuthScreen, {
+      route: {
+        name: "Auth",
+        key: "auth",
+        params: { advertiserPlanSelection: { planId: "annual", highlights: [] } },
+      },
+    }));
   });
   const root = tree!.root;
-  const createAccount = root
-    .findAllByType(Chip)
-    .find((chip) => chip.props.title === "Criar conta")!;
-  await act(async () => createAccount.props.onPress());
   const email = root
     .findAllByType(Field)
     .find((field) => field.props.label === "E-mail");

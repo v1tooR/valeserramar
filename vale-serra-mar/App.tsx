@@ -56,6 +56,7 @@ import {
   ManageRoomsScreen,
   EditRoomScreen,
 } from "./src/screens/ManageBusiness";
+import { ManageOffersScreen } from "./src/screens/ManageOffers";
 import {
   ReviewStatusScreen,
   DashboardScreen,
@@ -95,6 +96,7 @@ const screens: Record<ScreenName, React.ComponentType<ScreenProps>> = {
   Dashboard: DashboardScreen,
   EditBusiness: EditBusinessScreen,
   ManageMenu: ManageMenuScreen,
+  ManageOffers: ManageOffersScreen,
   EditProduct: EditProductScreen,
   ManageRooms: ManageRoomsScreen,
   EditRoom: EditRoomScreen,
@@ -108,13 +110,12 @@ const screens: Record<ScreenName, React.ComponentType<ScreenProps>> = {
 };
 const protectedScreens: ScreenName[] = [
   "Activate",
-  "BusinessWelcome",
-  "BusinessPlanReview",
   "BusinessWizard",
   "ReviewStatus",
   "Dashboard",
   "EditBusiness",
   "ManageMenu",
+  "ManageOffers",
   "EditProduct",
   "ManageRooms",
   "EditRoom",
@@ -125,6 +126,7 @@ const protectedScreens: ScreenName[] = [
   "Subscription",
 ];
 const approvedOnly: ScreenName[] = [
+  "ManageOffers",
   "ManageReservations",
   "RespondReservation",
   "Indicators",
@@ -145,7 +147,7 @@ function RoutedScreen(props: ScreenProps) {
       <Page title="Área do anunciante">
         <Notice>Entre na sua conta para gerenciar seu negócio.</Notice>
         <Button
-          title="Entrar ou criar conta"
+          title="Entrar"
           onPress={() => navigation.navigate("Auth")}
         />
       </Page>
@@ -156,7 +158,7 @@ function RoutedScreen(props: ScreenProps) {
     b &&
     protectedScreens.includes(route.name) &&
     !b.owner &&
-    !["Activate", "BusinessWelcome", "BusinessPlanReview"].includes(route.name)
+    route.name !== "Activate"
   )
     return (
       <Page title="Meu negócio">

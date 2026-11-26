@@ -86,6 +86,10 @@ export const productSchema = z.object({
   price: z.number().nonnegative(),
   photo,
   available: z.boolean(),
+  offer: z.object({
+    price: z.number().nonnegative(),
+    expiresAt: z.string().refine((value) => Number.isFinite(Date.parse(value))),
+  }).optional(),
   extras: z.array(
     z.object({
       id: z.string(),
@@ -188,10 +192,20 @@ export const businessInput = businessSchema
     regions.some((r) => r.name === b.region && r.cities.includes(b.city)),
   )
   .refine((b) => new Set(b.rooms.map((r) => r.id)).size === b.rooms.length);
-export const productInput = productSchema.omit({ id: true }).extend({
+export const productInput = productSchema.omit({ id: true, offer: true }).extend({
   photo: image,
   name: z.string().trim().min(1).max(160),
   price: z.number().min(0).max(1e6),
+});
+export const offerInput = z.object({
+  durationHours: z.number().int().positive().max(2147483647),
+  products: z.array(z.object({
+    productId: z.uuid().transform((id) => id.toLowerCase()),
+    priceCents: z.number().int().min(0).max(100000000),
+  })).min(1).refine(
+    (products) => new Set(products.map(({ productId }) => productId)).size === products.length,
+    "Selecione cada produto uma única vez.",
+  ),
 });
 export const bookingInput = reservationSchema
   .omit({

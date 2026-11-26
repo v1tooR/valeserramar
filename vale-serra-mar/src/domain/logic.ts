@@ -23,6 +23,14 @@ export const isRestaurant = (segment: string) =>
 export const canReserve = (business: Business) =>
   business.acceptsReservations &&
   (business.segment === "Hospedagem" || isRestaurant(business.segment));
+export function activeOffer(product: Product, now = Date.now()) {
+  const offer = product.offer;
+  if (product.available && offer && offer.price < product.price &&
+      Date.parse(offer.expiresAt) > now) return offer;
+}
+export const productPrice = (product: Product, now = Date.now()) =>
+  activeOffer(product, now)?.price ?? product.price;
+
 export const cartTotal = (items: CartItem[]) =>
   items.reduce(
     (sum, item) =>
@@ -202,7 +210,7 @@ export function validateCart(items: CartItem[], products: Product[]) {
     if (!current || !current.available)
       return `${item.name} não está disponível. Remova o item para continuar.`;
     if (
-      current.price !== item.unitPrice ||
+      productPrice(current) !== item.unitPrice ||
       item.extras.some(
         (extra) =>
           !current.extras.some(

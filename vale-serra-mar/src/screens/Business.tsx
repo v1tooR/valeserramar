@@ -3,9 +3,11 @@ import { Tap as Pressable } from "../components/Motion";
 import React, { useState } from "react";
 import { Image, Share, Text, View, useWindowDimensions } from "react-native";
 import { photoSource } from "../assets";
+import { ProductPrice } from "../components/ProductPrice";
 import { useStore } from "../store";
 import { useNav, type ScreenProps } from "../navigation";
 import {
+  activeOffer,
   canReserve,
   filterBusinesses,
   isOpen,
@@ -106,6 +108,9 @@ export function BusinessScreen({ route }: ScreenProps) {
     restaurant = isRestaurant(b.segment),
     reservationsAvailable = canReserve(b),
     favorite = state.favorites.includes(b.id);
+  const offers = b.status === "Aprovado"
+    ? state.products.filter((product) => product.businessId === b.id && activeOffer(product))
+    : [];
   return (
     <Page
       title={b.name}
@@ -239,6 +244,37 @@ export function BusinessScreen({ route }: ScreenProps) {
           </Pressable>
         ))}
       </View>
+      {offers.length > 0 && (
+        <>
+          <Section title="Ofertas" />
+          {offers.map((product) => (
+            <Pressable
+              key={product.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Ver oferta de ${product.name}`}
+              style={[s.card, s.row]}
+              onPress={() => {
+                if (restaurant) {
+                  nav.navigate("Product", { productId: product.id });
+                } else {
+                  return contact(
+                    b,
+                    `Olá! Vi a oferta de ${product.name} no Vale, Serra e Mar. Podem me passar mais informações?`,
+                  );
+                }
+              }}
+            >
+              {!!product.photo && <Image source={photoSource(product.photo)} style={s.thumb} />}
+              <View style={[s.grow, { gap: 4 }]}>
+                <Text style={s.heading}>{product.name}</Text>
+                {!!product.description && <Text style={s.muted}>{product.description}</Text>}
+                <ProductPrice product={product} />
+              </View>
+              <Icon name={restaurant ? "chevron-right" : "message-circle"} />
+            </Pressable>
+          ))}
+        </>
+      )}
       <Section title="Sobre" />
       <Text style={s.body}>{b.description}</Text>
       <Section title={hotel ? "Comodidades" : "Serviços"} />

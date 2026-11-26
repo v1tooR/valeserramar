@@ -81,6 +81,10 @@ export const productSchema = z.object({
   price: z.number().nonnegative(),
   photo,
   available: z.boolean(),
+  offer: z.object({
+    price: z.number().nonnegative(),
+    expiresAt: z.string().refine((value) => Number.isFinite(Date.parse(value))),
+  }).optional(),
   extras: z.array(
     z.object({
       id: z.string(),

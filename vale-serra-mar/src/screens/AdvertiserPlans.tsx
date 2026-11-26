@@ -60,7 +60,7 @@ export function AdvertiserPlansScreen() {
             <Text style={styles.interval}>/ {plan.interval}</Text>
           </View>
           <Button
-            title={`Assinar plano ${plan.label.toLowerCase()}`}
+            title={`Ver plano ${plan.label.toLowerCase()}`}
             icon="arrow-right"
             secondary={plan.id === "monthly"}
             onPress={() =>
@@ -117,9 +117,42 @@ export function AdvertiserPlanTotals({
   );
 }
 
+export function startBusinessRegistration(
+  nav: ReturnType<typeof useNav>,
+  { state, saveDraft }: Pick<ReturnType<typeof useStore>, "state" | "saveDraft">,
+  selection: AdvertiserPlanSelection,
+  phone = state.profile?.phone || "",
+) {
+  const business = {
+    ...emptyBusiness(`draft-${uid()}`),
+    phone,
+    region: state.region || regions[0].name,
+    city: state.city || "Caçapava",
+    draftPlan: selection,
+  };
+  saveDraft(business);
+
+  const stack = nav.getState();
+  const previousRoutes = stack.routes.slice(0, -1);
+  if (previousRoutes.at(-1)?.name === "BusinessPlanReview") previousRoutes.pop();
+  if (previousRoutes.at(-1)?.name === "BusinessWelcome") previousRoutes.pop();
+  nav.reset({
+    ...stack,
+    index: previousRoutes.length,
+    routes: [
+      ...previousRoutes,
+      {
+        key: `BusinessWizard-${business.id}`,
+        name: "BusinessWizard",
+        params: { businessId: business.id, step: 0 },
+      },
+    ],
+  });
+}
+
 export function BusinessPlanReviewScreen({ route }: ScreenProps) {
   const nav = useNav();
-  const { state, saveDraft } = useStore();
+  const store = useStore();
   const [highlights, setHighlights] = useState<AdvertiserHighlightId[]>([]);
   const planId = route.params?.advertiserPlanId;
   const plan =
@@ -138,33 +171,12 @@ export function BusinessPlanReviewScreen({ route }: ScreenProps) {
 
   const selection = { planId: plan.id, highlights };
 
-  function beginRegistration() {
-    const business = {
-      ...emptyBusiness(`draft-${uid()}`),
-      phone: state.profile?.phone || "",
-      region: state.region || regions[0].name,
-      city: state.city || "Caçapava",
-      draftPlan: selection,
-    };
-    saveDraft(business);
-    const stack = nav.getState();
-    const { routes } = stack;
-    const previousRoutes = routes.slice(
-      0,
-      routes.at(-2)?.name === "BusinessWelcome" ? -2 : -1,
-    );
-    nav.reset({
-      ...stack,
-      index: previousRoutes.length,
-      routes: [
-        ...previousRoutes,
-        {
-          key: `BusinessWizard-${business.id}`,
-          name: "BusinessWizard",
-          params: { businessId: business.id, step: 0 },
-        },
-      ],
-    });
+  function subscribe() {
+    if (!store.state.authenticated) {
+      nav.navigate("Auth", { advertiserPlanSelection: selection });
+      return;
+    }
+    startBusinessRegistration(nav, store, selection);
   }
 
   return (
@@ -172,9 +184,9 @@ export function BusinessPlanReviewScreen({ route }: ScreenProps) {
       title="Plano e destaques"
       footer={
         <Button
-          title="Continuar para o cadastro"
+          title={`Assinar plano ${plan.label.toLowerCase()}`}
           icon="arrow-right"
-          onPress={beginRegistration}
+          onPress={subscribe}
         />
       }
     >

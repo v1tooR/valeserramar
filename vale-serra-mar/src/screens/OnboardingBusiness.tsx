@@ -23,26 +23,23 @@ import {
   Toggle,
 } from "../components/ui";
 import { pickPhoto } from "../services/photos";
-import { AdvertiserPlanTotals } from "./AdvertiserPlans";
+import {
+  AdvertiserPlanTotals,
+  startBusinessRegistration,
+} from "./AdvertiserPlans";
 export function AdvertiseScreen() {
   const nav = useNav();
   const { state } = useStore();
-  function startRegistration() {
-    if (state.authenticated) {
-      nav.navigate("BusinessWelcome");
-    } else {
-      nav.navigate("Auth", { startBusinessRegistration: true });
-    }
-  }
+  const showPlans = () => nav.navigate("BusinessWelcome");
   return (
     <Page
       title="Anuncie no guia"
-      onAdvertisePress={startRegistration}
+      onAdvertisePress={showPlans}
       footer={
         <Button
-          title="Quero anunciar meu negócio"
+          title="Ver planos de anúncio"
           icon="arrow-right"
-          onPress={startRegistration}
+          onPress={showPlans}
         />
       }
     >
@@ -63,30 +60,36 @@ export function AdvertiseScreen() {
         title="Cardápio digital"
         subtitle="Categorias, preços e fotos dos seus pratos"
         icon="book-open"
-        onPress={startRegistration}
+        onPress={showPlans}
       />
       <Row
         title="Solicitações de reserva"
         subtitle="Confirme mesas e hospedagens manualmente"
         icon="calendar"
-        onPress={startRegistration}
+        onPress={showPlans}
       />
       <Row
         title="Indicadores básicos"
         subtitle="Visualizações e solicitações recebidas"
         icon="bar-chart-2"
-        onPress={startRegistration}
+        onPress={showPlans}
       />
       <Notice>
         Escolha um plano de lançamento antes de preencher o cadastro do seu estabelecimento.
       </Notice>
+      <Button
+        secondary
+        title={state.authenticated ? "Área do anunciante" : "Já sou anunciante"}
+        onPress={() => nav.navigate(state.authenticated ? "Dashboard" : "Auth")}
+      />
     </Page>
   );
 }
 export function AuthScreen({ route }: { route?: ScreenProps["route"] }) {
-  const { authenticate, state } = useStore(),
+  const { authenticate, state, saveDraft } = useStore(),
     nav = useNav();
-  const [create, setCreate] = useState(false),
+  const selection = route?.params?.advertiserPlanSelection;
+  const [create, setCreate] = useState(!!selection),
     [name, setName] = useState(""),
     [email, setEmail] = useState(""),
     [phone, setPhone] = useState(""),
@@ -106,14 +109,22 @@ export function AuthScreen({ route }: { route?: ScreenProps["route"] }) {
       return setError("Use uma senha com pelo menos 8 caracteres.");
     if (create && (!name.trim() || !validPhone(phone)))
       return setError("Preencha nome e telefone com DDD.");
-    await authenticate(create ? "register" : "login", {
+    const profile = await authenticate(create ? "register" : "login", {
       email: email.trim().toLowerCase(),
       password,
       ...(create ? { name: name.trim(), phone } : {}),
     });
-    nav.replace(
-      route?.params?.startBusinessRegistration ? "BusinessWelcome" : "Dashboard",
-    );
+    if (!nav.isFocused()) return;
+    if (selection) {
+      startBusinessRegistration(
+        nav,
+        { state, saveDraft },
+        selection,
+        profile.phone,
+      );
+    } else {
+      nav.replace("Dashboard");
+    }
   };
   return (
     <Page title="Área do anunciante" keyboardAware>
@@ -123,21 +134,23 @@ export function AuthScreen({ route }: { route?: ScreenProps["route"] }) {
       </Text>
       <Text style={s.muted}>
         {create
-          ? "Preencha seus dados para começar a divulgar."
+          ? "Preencha seus dados para continuar com o plano escolhido."
           : "Entre para cuidar do seu negócio."}
       </Text>
-      <View style={s.row}>
-        <Chip
-          title="Entrar"
-          selected={!create}
-          onPress={() => selectMode(false)}
-        />
-        <Chip
-          title="Criar conta"
-          selected={create}
-          onPress={() => selectMode(true)}
-        />
-      </View>
+      {selection && (
+        <View style={s.row}>
+          <Chip
+            title="Entrar"
+            selected={!create}
+            onPress={() => selectMode(false)}
+          />
+          <Chip
+            title="Criar conta"
+            selected={create}
+            onPress={() => selectMode(true)}
+          />
+        </View>
+      )}
       {create && (
         <Field
           label="Nome completo"
@@ -185,8 +198,12 @@ export function AuthScreen({ route }: { route?: ScreenProps["route"] }) {
       />
       <Button
         secondary
-        title="Continuar explorando"
-        onPress={() => (state.region ? nav.navigate("Home") : nav.popTo("Welcome"))}
+        title={selection ? "Voltar ao plano" : "Continuar explorando"}
+        onPress={() => {
+          if (selection) nav.goBack();
+          else if (state.region) nav.navigate("Home");
+          else nav.popTo("Welcome");
+        }}
       />
     </Page>
   );

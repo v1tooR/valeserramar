@@ -18,6 +18,7 @@ import {
 const mockNavigate = jest.fn();
 const mockReset = jest.fn();
 const mockSaveDraft = jest.fn<(business: Business) => void>();
+let mockAuthenticated = false;
 jest.mock("../src/navigation", () => ({
   useNav: () => ({
     navigate: mockNavigate,
@@ -33,7 +34,10 @@ jest.mock("../src/navigation", () => ({
 }));
 jest.mock("../src/store", () => ({
   useStore: () => ({
-    state: { profile: { phone: "12999999999" } },
+    state: {
+      authenticated: mockAuthenticated,
+      profile: mockAuthenticated ? { phone: "12999999999" } : null,
+    },
     saveDraft: mockSaveDraft,
   }),
   uid: () => "plano-teste",
@@ -72,7 +76,9 @@ it.each(cases)(
   },
 );
 
-it("seleciona o plano, atualiza o total e abre o cadastro com um rascunho local", async () => {
+it.each([false, true])("abre plano e destaques e encaminha ao assinar (autenticado: %s)", async (authenticated) => {
+  jest.clearAllMocks();
+  mockAuthenticated = authenticated;
   let plans!: ReactTestRenderer;
   let review!: ReactTestRenderer;
   try {
@@ -81,7 +87,7 @@ it("seleciona o plano, atualiza o total e abre o cadastro com um rascunho local"
     });
     const annual = plans.root
       .findAllByType(Button)
-      .find((button) => button.props.title === "Assinar plano anual")!;
+      .find((button) => button.props.title === "Ver plano anual")!;
     await act(async () => {
       annual.props.onPress();
     });
@@ -110,13 +116,26 @@ it("seleciona o plano, atualiza o total e abre o cadastro com um rascunho local"
         .findAllByType(Text)
         .some((label) => String(label.props.children).includes("2.900,00")),
     ).toBe(true);
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
+    expect(mockSaveDraft).not.toHaveBeenCalled();
+    const selection = { planId: "annual", highlights: ["home", "category"] };
+    const subscribe = review.root.findByType(Button);
+    expect(subscribe.props.title).toBe("Assinar plano anual");
     await act(async () => {
-      review.root.findByType(Button).props.onPress();
+      subscribe.props.onPress();
     });
+    if (!authenticated) {
+      expect(mockNavigate).toHaveBeenLastCalledWith("Auth", {
+        advertiserPlanSelection: selection,
+      });
+      expect(mockSaveDraft).not.toHaveBeenCalled();
+      expect(mockReset).not.toHaveBeenCalled();
+      return;
+    }
     expect(mockSaveDraft).toHaveBeenCalledWith(
       expect.objectContaining({
         id: "draft-plano-teste",
-        draftPlan: { planId: "annual", highlights: ["home", "category"] },
+        draftPlan: selection,
       }),
     );
     expect(mockReset).toHaveBeenCalledWith({

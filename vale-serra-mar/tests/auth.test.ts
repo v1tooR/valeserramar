@@ -1,17 +1,56 @@
-import { expect, it, jest } from "@jest/globals";
+import { beforeEach, expect, it, jest } from "@jest/globals";
 import React from "react";
 import { TextInput } from "react-native";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { Button, Chip, Icon } from "../src/components/ui";
-import { AuthScreen } from "../src/screens/OnboardingBusiness";
+import type { AdvertiserPlanSelection } from "../src/domain/advertiserPlans";
+import type { ScreenProps } from "../src/navigation";
+import { AdvertiseScreen, AuthScreen } from "../src/screens/OnboardingBusiness";
+import type { useStore } from "../src/store";
 
-const mockAuthenticate = jest.fn();
+const profile = {
+  name: "Anunciante",
+  email: "teste@example.com",
+  phone: "12999999999",
+};
+const selection: AdvertiserPlanSelection = {
+  planId: "monthly",
+  highlights: ["category"],
+};
+const signupRoute: ScreenProps["route"] = {
+  name: "Auth",
+  key: "auth",
+  params: { advertiserPlanSelection: selection },
+};
+const mockAuthenticate = jest.fn<ReturnType<typeof useStore>["authenticate"]>();
+const mockSaveDraft = jest.fn();
+const mockNavigate = jest.fn();
 const mockReplace = jest.fn();
+const mockReset = jest.fn();
 jest.mock("../src/store", () => ({
-  useStore: () => ({ authenticate: mockAuthenticate }),
+  useStore: () => ({
+    state: { region: "Vale do Paraíba", city: "Caçapava" },
+    authenticate: mockAuthenticate,
+    saveDraft: mockSaveDraft,
+  }),
+  uid: () => "anuncio-teste",
 }));
 jest.mock("../src/navigation", () => ({
-  useNav: () => ({ replace: mockReplace }),
+  useNav: () => ({
+    navigate: mockNavigate,
+    replace: mockReplace,
+    reset: mockReset,
+    isFocused: () => true,
+    getState: () => ({
+      routes: [
+        { name: "Home" },
+        { name: "Advertise" },
+        { name: "BusinessWelcome" },
+        { name: "BusinessPlanReview" },
+        { name: "Auth" },
+      ],
+    }),
+  }),
 }));
 jest.mock("../src/components/Motion", () => {
   const { Pressable, View } = jest.requireActual<typeof import("react-native")>(
@@ -20,30 +59,114 @@ jest.mock("../src/components/Motion", () => {
   return { Tap: Pressable, Entrance: View };
 });
 jest.mock("@expo/vector-icons", () => ({ Feather: () => null }));
-jest.mock("../src/components/ui", () => ({
-  ...jest.requireActual<typeof import("../src/components/ui")>(
-    "../src/components/ui",
-  ),
-  Page: ({ children }: React.PropsWithChildren) => children,
-}));
+jest.mock("../src/components/ui", () => {
+  const React = jest.requireActual<typeof import("react")>("react");
+  return {
+    ...jest.requireActual<typeof import("../src/components/ui")>(
+      "../src/components/ui",
+    ),
+    Page: ({
+      children,
+      footer,
+    }: React.PropsWithChildren<{ footer?: React.ReactNode }>) =>
+      React.createElement(React.Fragment, null, children, footer),
+  };
+});
 
-it("depois de entrar pelo atalho de anúncio, segue para a escolha do plano", async () => {
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockAuthenticate.mockResolvedValue(profile);
+});
+
+it("oferece a consulta de planos e a entrada para quem já é anunciante", async () => {
   let tree!: ReactTestRenderer;
   await act(async () => {
-    tree = create(React.createElement(AuthScreen, {
-      route: { name: "Auth", key: "auth", params: { startBusinessRegistration: true } },
-    }));
+    tree = create(React.createElement(AdvertiseScreen));
   });
   try {
+    const button = (title: string) =>
+      tree.root.findAllByType(Button).find(({ props }) => props.title === title)!;
+    await act(async () => button("Ver planos de anúncio").props.onPress());
+    expect(mockNavigate).toHaveBeenCalledWith("BusinessWelcome");
+    await act(async () => button("Já sou anunciante").props.onPress());
+    expect(mockNavigate).toHaveBeenLastCalledWith("Auth");
+    expect(mockAuthenticate).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => tree.unmount());
+  }
+});
+
+it("entra na conta existente sem exigir a escolha de um plano", async () => {
+  let tree!: ReactTestRenderer;
+  await act(async () => {
+    tree = create(React.createElement(AuthScreen));
+  });
+  try {
+    expect(tree.root.findAllByType(Chip)).toHaveLength(0);
     const [email, password] = tree.root.findAllByType(TextInput);
-    await act(async () => email.props.onChangeText("teste@example.com"));
+    await act(async () => email.props.onChangeText(profile.email));
     await act(async () => password.props.onChangeText("senha-de-teste"));
     const enter = tree.root.findAllByType(Button).find(({ props }) => props.title === "Entrar")!;
     await act(async () => enter.props.onPress());
     expect(mockAuthenticate).toHaveBeenCalledWith("login", {
-      email: "teste@example.com", password: "senha-de-teste",
+      email: profile.email, password: "senha-de-teste",
     });
-    expect(mockReplace).toHaveBeenCalledWith("BusinessWelcome");
+    expect(mockReplace).toHaveBeenCalledWith("Dashboard");
+    expect(mockSaveDraft).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => tree.unmount());
+  }
+});
+
+it.each(["register", "login"] as const)("retoma o plano e os destaques depois de %s", async (mode) => {
+  let tree!: ReactTestRenderer;
+  await act(async () => {
+    tree = create(React.createElement(AuthScreen, { route: signupRoute }));
+  });
+  const chip = (title: string) =>
+    tree.root.findAllByType(Chip).find(({ props }) => props.title === title)!;
+  const field = (label: string) =>
+    tree.root.findAllByType(TextInput).find(({ props }) => props.accessibilityLabel === label)!;
+  try {
+    expect(chip("Criar conta").props.selected).toBe(true);
+    if (mode === "login") {
+      await act(async () => chip("Entrar").props.onPress());
+    } else {
+      await act(async () => {
+        field("Nome completo").props.onChangeText(profile.name);
+        field("Telefone com DDD").props.onChangeText(profile.phone);
+      });
+    }
+    await act(async () => {
+      field("E-mail").props.onChangeText(profile.email);
+      field("Senha").props.onChangeText("senha-de-teste");
+    });
+    const submit = tree.root.findAllByType(Button).find(
+      ({ props }) => props.title === (mode === "login" ? "Entrar" : "Criar conta"),
+    )!;
+    await act(async () => submit.props.onPress());
+    expect(mockAuthenticate).toHaveBeenCalledWith(mode, {
+      email: profile.email,
+      password: "senha-de-teste",
+      ...(mode === "register" ? { name: profile.name, phone: profile.phone } : {}),
+    });
+    expect(mockSaveDraft).toHaveBeenCalledWith(expect.objectContaining({
+      id: "draft-anuncio-teste",
+      phone: profile.phone,
+      draftPlan: selection,
+    }));
+    expect(mockReset).toHaveBeenCalledWith({
+      index: 2,
+      routes: [
+        { name: "Home" },
+        { name: "Advertise" },
+        {
+          name: "BusinessWizard",
+          key: "BusinessWizard-draft-anuncio-teste",
+          params: { businessId: "draft-anuncio-teste", step: 0 },
+        },
+      ],
+    });
   } finally {
     await act(async () => tree.unmount());
   }
@@ -52,7 +175,7 @@ it("depois de entrar pelo atalho de anúncio, segue para a escolha do plano", as
 it("mostra e oculta a senha em Entrar e Criar conta, preservando o texto", async () => {
   let tree!: ReactTestRenderer;
   await act(async () => {
-    tree = create(React.createElement(AuthScreen));
+    tree = create(React.createElement(AuthScreen, { route: signupRoute }));
   });
   const passwordField = () =>
     tree.root.findAllByType(TextInput).find(
@@ -67,6 +190,7 @@ it("mostra e oculta a senha em Entrar e Criar conta, preservando o texto", async
     tree.root.findAllByType(Chip).find(({ props }) => props.title === title)!;
 
   try {
+    await act(async () => mode("Entrar").props.onPress());
     const password = "senha-de-teste";
     expect(passwordField().props.secureTextEntry).toBe(true);
     expect(passwordField().props.autoComplete).toBe("current-password");

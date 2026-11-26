@@ -5,6 +5,7 @@ import { fail, hash, parse, session } from "./security.js";
 import {
   businessInput,
   diningSegments,
+  offerInput,
   productInput,
   tableReservationsInput,
 } from "./schemas.js";
@@ -25,10 +26,20 @@ export const businessView = (record, owner) => ({
     ? { home: record.home_highlight ?? null, explore: record.explore_highlight ?? null }
     : undefined,
 });
+const offerColumns = "o.price_cents AS offer_price_cents, o.expires_at AS offer_expires_at";
+const activeOfferJoin = `LEFT JOIN vsm.product_offers o
+  ON o.product_id=p.id AND o.expires_at>statement_timestamp()`;
 const productView = (record) => ({
   ...record.data,
   id: record.id,
   businessId: record.business_id,
+  offer: record.data.available && Number.isInteger(record.offer_price_cents)
+    && record.offer_price_cents / 100 < record.data.price
+    ? {
+        price: record.offer_price_cents / 100,
+        expiresAt: record.offer_expires_at.toISOString(),
+      }
+    : undefined,
 });
 
 export async function owned(db, id, accountId, lock = false) {
@@ -113,7 +124,9 @@ export function catalogRoutes(app, db, origin) {
     );
     const products = await rows(
       db,
-      "SELECT * FROM vsm.products WHERE business_id=ANY($1::uuid[]) AND data->>'available'='true' ORDER BY id",
+      `SELECT p.*, ${offerColumns} FROM vsm.products p
+       ${activeOfferJoin}
+       WHERE p.business_id=ANY($1::uuid[]) AND p.data->>'available'='true' ORDER BY p.id`,
       [businesses.map(({ id }) => id)],
     );
     return {
@@ -130,7 +143,10 @@ export function catalogRoutes(app, db, origin) {
     );
     const products = await rows(
       db,
-      "SELECT p.* FROM vsm.products p JOIN vsm.businesses b ON b.id=p.business_id WHERE b.owner_id=$1 AND b.deleted_at IS NULL ORDER BY p.id",
+      `SELECT p.*, ${offerColumns}
+       FROM vsm.products p JOIN vsm.businesses b ON b.id=p.business_id
+       ${activeOfferJoin} AND b.status='Aprovado'
+       WHERE b.owner_id=$1 AND b.deleted_at IS NULL ORDER BY p.id`,
       [accountId],
     );
     const reservations = await rows(
@@ -254,8 +270,8 @@ export function catalogRoutes(app, db, origin) {
     if (data.businessId !== id) fail(422, "Estabelecimento inválido.");
     const work = async (client) => {
       const business = await owned(client, id, accountId, true);
-      if (!diningSegments.includes(business.data.segment))
-        fail(422, "Cardápio indisponível para este segmento.");
+      if (!diningSegments.includes(business.data.segment) && business.status !== "Aprovado")
+        fail(422, "Aguarde a aprovação para gerenciar produtos e serviços.");
       if (["Em análise", "Desativado"].includes(business.status))
         fail(409, "O anúncio está bloqueado para edição.");
       await checkImages(client, [data.photo], accountId, origin);
@@ -271,7 +287,11 @@ export function catalogRoutes(app, db, origin) {
             [randomUUID(), id, data],
           );
       if (!product) fail(404, "Produto não encontrado.");
-      return productView(product);
+      const offer = req.params.productId && business.status === "Aprovado"
+        ? await row(client, `SELECT ${offerColumns} FROM vsm.products p
+           ${activeOfferJoin} WHERE p.id=$1`, [product.id])
+        : undefined;
+      return productView({ ...product, ...offer });
     };
     if (req.params.productId) return transaction(db, work);
     return reply
@@ -294,6 +314,49 @@ export function catalogRoutes(app, db, origin) {
       );
     });
     return reply.code(204).send();
+  });
+  app.post("/businesses/:id/offers", async (req, reply) => {
+    const { accountId } = await session(db, req);
+    const id = requireId(req.params.id).toLowerCase();
+    const data = parse(offerInput, req.body);
+    const ids = data.products.map(({ productId }) => productId);
+    const saved = await idempotent(
+      db, req, `${accountId}:offer:${id}`, data,
+      async (client) => {
+        const business = await owned(client, id, accountId, true);
+        if (business.status !== "Aprovado")
+          fail(409, "O anúncio precisa estar aprovado para publicar ofertas.");
+
+        const products = await rows(client,
+          `SELECT * FROM vsm.products WHERE business_id=$1
+           AND id=ANY($2::uuid[]) AND data->>'available'='true' FOR UPDATE`,
+          [id, ids],
+        );
+        if (products.length !== ids.length)
+          fail(422, "Selecione produtos disponíveis deste estabelecimento.");
+        const byId = new Map(products.map((product) => [product.id, product]));
+        for (const { productId, priceCents } of data.products) {
+          if (!(priceCents / 100 < byId.get(productId).data.price))
+            fail(422, "O preço em oferta deve ser menor que o preço normal.");
+        }
+
+        const offers = await rows(client,
+          `INSERT INTO vsm.product_offers(product_id,price_cents,expires_at)
+           SELECT product_id, price_cents, statement_timestamp() + $3::int * interval '1 hour'
+           FROM unnest($1::uuid[], $2::int[]) AS item(product_id, price_cents)
+           ON CONFLICT (product_id) DO UPDATE
+             SET price_cents=EXCLUDED.price_cents, expires_at=EXCLUDED.expires_at
+           RETURNING product_id, price_cents AS offer_price_cents, expires_at AS offer_expires_at`,
+          [ids, data.products.map(({ priceCents }) => priceCents), data.durationHours],
+        );
+        return {
+          products: offers.map((offer) =>
+            productView({ ...byId.get(offer.product_id), ...offer }),
+          ),
+        };
+      },
+    );
+    return reply.code(201).send(saved);
   });
   app.get("/businesses/:id/metrics", async (req) => {
     const { accountId } = await session(db, req);

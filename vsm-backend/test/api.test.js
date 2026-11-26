@@ -272,6 +272,10 @@ test("API com PostgreSQL: contrato, isolamento, aprovação, mídia e reservas",
         },
       }),
     );
+    const offersPath = `/businesses/${b.id}/offers`;
+    const singleOffer = { durationHours: 2, products: [{ productId: p.id, priceCents: 3900 }] };
+    await send("POST", offersPath, { body: singleOffer, status: 401 });
+    await send("POST", offersPath, { token, body: singleOffer, status: 409 });
     const submitted = await send("POST", "/businesses/" + b.id + "/submit", {
       token,
       body: {},
@@ -291,6 +295,57 @@ test("API com PostgreSQL: contrato, isolamento, aprovação, mídia e reservas",
     assert.equal(catalog.businesses[0].owner, false);
     assert.equal(catalog.businesses[0].subcategory, "Lanchonetes");
     assert.equal(catalog.products[0].id, p.id);
+
+    const dessert = await send("POST", `/businesses/${b.id}/products`, {
+      token, body: { ...p, name: "Sobremesa", price: 12 }, status: 201,
+    });
+    const offerBody = {
+      durationHours: 2,
+      products: [
+        ...singleOffer.products,
+        { productId: dessert.id, priceCents: 750 },
+      ],
+    };
+    await send("POST", offersPath, { token: second, body: offerBody, status: 404 });
+    await send("POST", offersPath, {
+      token,
+      body: { ...offerBody, durationHours: 0 },
+      status: 422,
+    });
+    await send("POST", offersPath, {
+      token,
+      body: { ...offerBody, products: [singleOffer.products[0], { productId: dessert.id, priceCents: 1200 }] },
+      status: 422,
+    });
+    assert.ok((await send("GET", "/catalog")).products.every((item) => !item.offer));
+    const [published, retry] = await Promise.all([1, 2].map(() =>
+      send("POST", offersPath, { token, body: offerBody, key: "offer-1", status: 201 }),
+    ));
+    assert.deepEqual(retry, published);
+    const expiry = published.products[0].offer.expiresAt;
+    assert.ok(Date.parse(expiry) - Date.now() > 7190000);
+    for (const response of [
+      await send("GET", "/catalog"),
+      await send("GET", "/me/workspace", { token }),
+    ]) {
+      const byId = new Map(response.products.map((item) => [item.id, item]));
+      assert.equal(byId.get(p.id).price, 50);
+      assert.deepEqual(byId.get(p.id).offer, { price: 39, expiresAt: expiry });
+      assert.deepEqual(byId.get(dessert.id).offer, { price: 7.5, expiresAt: expiry });
+    }
+
+    await send("PATCH", `/businesses/${b.id}/products/${dessert.id}`, {
+      token, body: { ...dessert, available: false },
+    });
+    await send("POST", offersPath, { token, body: offerBody, status: 422 });
+    await send("DELETE", `/businesses/${b.id}/products/${dessert.id}`, {
+      token, status: 204,
+    });
+    assert.equal((await db.query("SELECT * FROM vsm.product_offers WHERE product_id=$1", [dessert.id])).rowCount, 0);
+    await db.query("UPDATE vsm.product_offers SET expires_at=now()-interval '1 second' WHERE product_id=$1", [p.id]);
+    const [expired] = (await send("GET", "/catalog")).products;
+    assert.equal(expired.price, 50);
+    assert.equal(expired.offer, undefined);
 
     const guest = (await send("POST", "/guest-sessions", { status: 201 }))
       .token;

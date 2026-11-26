@@ -12,6 +12,7 @@ import { catalogFiltersFor, initialState, regionForCity } from "./domain/catalog
 import type {
   Business,
   CatalogFilters,
+  OfferInput,
   Product,
   Reservation,
   Profile,
@@ -43,7 +44,7 @@ type Store = {
   authenticate: (
     mode: "login" | "register",
     data: { email: string; password: string; name?: string; phone?: string },
-  ) => Promise<void>;
+  ) => Promise<Profile>;
   logout: () => Promise<void>;
   updateProfile: (p: Profile) => Promise<void>;
   saveDraft: (b: Business) => void;
@@ -55,6 +56,7 @@ type Store = {
   submitBusiness: (b: Business) => Promise<Business>;
   saveProduct: (p: Product) => Promise<void>;
   deleteProduct: (p: Product) => Promise<void>;
+  createOffers: (businessId: string, data: OfferInput, key: string) => Promise<Product[]>;
   addReservation: (r: Reservation) => Promise<Reservation>;
   cancelReservation: (id: string) => Promise<void>;
   respondReservation: (
@@ -244,6 +246,28 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     });
     return () => subscription.remove();
   }, [ready]);
+  useEffect(() => {
+    const nextExpiry = state.products.reduce(
+      (soonest, { offer }) => offer
+        ? Math.min(soonest, Date.parse(offer.expiresAt))
+        : soonest,
+      Infinity,
+    );
+    if (!Number.isFinite(nextExpiry)) return;
+    const delay = Math.min(2147483647, Math.max(0, nextExpiry - Date.now()));
+    const timer = setTimeout(() => {
+      const now = Date.now();
+      setState((s) => ({
+        ...s,
+        products: s.products.map((product) =>
+          product.offer && Date.parse(product.offer.expiresAt) <= now
+            ? { ...product, offer: undefined }
+            : product,
+        ),
+      }));
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [state.products]);
   const saveDraft = (b: Business) =>
     setState((s) => ({
       ...s,
@@ -359,6 +383,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         },
         submitBusiness,
         saveProduct,
+        createOffers: async (businessId, data, key) => {
+          const version = revision.current;
+          const products = await repository.createOffers(businessId, data, key);
+          requireCurrent(version);
+          setState((s) => ({ ...s, products: merge(s.products, products) }));
+          await refresh();
+          requireCurrent(version);
+          return products;
+        },
         authenticate: async (mode, data) => {
           const result = await repository.auth(mode, data);
           await setAccessToken(result.token);
@@ -374,6 +407,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             profile: result.profile,
           }));
           await refresh();
+          return result.profile;
         },
         logout: async () => {
           try {

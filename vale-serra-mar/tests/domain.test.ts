@@ -12,6 +12,7 @@ import {
   highlightedBusinesses,
   isOpen,
   orderMessage,
+  productPrice,
 } from "../src/domain/logic";
 import { businesses, products } from "./fixtures";
 import type { CartItem, Reservation, Filters } from "../src/domain/models";
@@ -82,6 +83,20 @@ it("rejeita item removido, indisponível ou com preço alterado", () => {
     ),
   ).not.toBe("");
   expect(validateCart([{ ...item, unitPrice: 80 }], products)).not.toBe("");
+});
+it("aplica a oferta ao carrinho até o horário de expiração", () => {
+  const product = products.find(({ id }) => id === item.productId)!;
+  const expiry = Date.now() + 3600_000;
+  const discounted = {
+    ...product,
+    offer: { price: 74.9, expiresAt: new Date(expiry).toISOString() },
+  };
+  const promotionalCart = [{ ...item, unitPrice: 74.9 }];
+  expect(productPrice(discounted, expiry - 1)).toBe(74.9);
+  expect(productPrice(discounted, expiry)).toBe(product.price);
+  expect(validateCart(promotionalCart, [discounted])).toBe("");
+  expect(validateCart([item], [discounted])).toMatch(/preço/);
+  expect(validateCart(promotionalCart, [product])).toMatch(/preço/);
 });
 it("rejeita datas impossíveis e calcula noites no calendário", () => {
   expect(parseDate("2030-02-30")).toBeNull();

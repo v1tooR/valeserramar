@@ -87,13 +87,15 @@ export function ManageMenuScreen({ route }: ScreenProps) {
   const { state, saveProduct } = useStore(),
     nav = useNav();
   const businessId = route.params?.businessId || state.businessId;
+  const business = state.businesses.find((b) => b.id === businessId);
+  const restaurant = !business || isRestaurant(business.segment);
   const [query, setQuery] = useState(""),
     [category, setCategory] = useState("Todas");
   const products = state.products.filter((p) => p.businessId === businessId);
   const categories = ["Todas", ...new Set(products.map((p) => p.category))];
   return (
     <Page
-      title="Cardápio"
+      title={restaurant ? "Cardápio" : "Produtos e serviços"}
       subtitle={`${products.length} produtos`}
       footer={
         <Button
@@ -142,7 +144,7 @@ export function ManageMenuScreen({ route }: ScreenProps) {
               />
             </View>
             <Toggle
-              title="Disponível no cardápio"
+              title={restaurant ? "Disponível no cardápio" : "Disponível para ofertas"}
               value={p.available}
               onChange={(available) => saveProduct({ ...p, available })}
             />
@@ -161,6 +163,8 @@ export function EditProductScreen({ route }: ScreenProps) {
   const { state, saveProduct, deleteProduct } = useStore(),
     nav = useNav();
   const businessId = route.params?.businessId || state.businessId;
+  const business = state.businesses.find((b) => b.id === businessId);
+  const restaurant = !business || isRestaurant(business.segment);
   const original = state.products.find((p) => p.id === route.params?.productId);
   const [draft, setDraft] = useState<Product>(
     original || {
@@ -168,7 +172,7 @@ export function EditProductScreen({ route }: ScreenProps) {
       businessId,
       name: "",
       description: "",
-      category: "Pratos da casa",
+      category: restaurant ? "Pratos da casa" : "Geral",
       price: 0,
       photo: "",
       available: true,
@@ -209,7 +213,7 @@ export function EditProductScreen({ route }: ScreenProps) {
             onPress={() =>
               Alert.alert(
                 "Excluir produto?",
-                "O produto será removido do cardápio.",
+                restaurant ? "O produto será removido do cardápio." : "O produto será removido do anúncio.",
                 [
                   { text: "Cancelar", style: "cancel" },
                   {
@@ -270,7 +274,7 @@ export function EditProductScreen({ route }: ScreenProps) {
         multiline
       />
       <Toggle
-        title="Disponível no cardápio"
+        title={restaurant ? "Disponível no cardápio" : "Disponível para ofertas"}
         value={draft.available}
         onChange={(available) => setDraft((d) => ({ ...d, available }))}
       />
