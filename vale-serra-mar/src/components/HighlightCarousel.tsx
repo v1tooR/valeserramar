@@ -1,11 +1,13 @@
 import React, { useState } from "react";
 import {
   Image,
+  ImageBackground,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
   View,
+  type ImageSourcePropType,
 } from "react-native";
 import { photoSource } from "../assets";
 import type { Business } from "../domain/models";
@@ -17,6 +19,7 @@ import { usePagedCarousel } from "./usePagedCarousel";
 
 const autoAdvanceMs = 5000;
 const bannerAspectRatio = 16 / 9;
+const announcementArtwork: ImageSourcePropType = require("../../assets/inicio-anuncie.jpg");
 
 function BannerImage({ photo }: { photo: Business["photo"] }) {
   const source = photoSource(photo);
@@ -58,13 +61,19 @@ function BannerImage({ photo }: { photo: Business["photo"] }) {
   );
 }
 
-export function HighlightCarousel({ businesses }: { businesses: Business[] }) {
+export function HighlightCarousel({
+  businesses,
+  onAdvertise,
+}: {
+  businesses: Business[];
+  onAdvertise?: () => void;
+}) {
   const nav = useNav();
   const slides = businesses.map((business) => business.id).join(",");
-  const count = businesses.length;
+  const count = businesses.length + (onAdvertise ? 1 : 0);
   const { current, move, width, onLayout, scrollProps } = usePagedCarousel(
     count,
-    slides,
+    onAdvertise ? `advertise:${slides}` : slides,
     autoAdvanceMs,
   );
 
@@ -72,10 +81,49 @@ export function HighlightCarousel({ businesses }: { businesses: Business[] }) {
 
   return (
     <View style={styles.section}>
-      <Section title="Em destaque" />
+      {businesses.length > 0 && <Section title="Em destaque" />}
       <View onLayout={onLayout}>
         {width > 0 && (
           <ScrollView {...scrollProps}>
+            {onAdvertise && (
+              <View
+                style={[styles.slide, { width }]}
+                accessibilityElementsHidden={current !== 0}
+                importantForAccessibility={
+                  current === 0 ? "auto" : "no-hide-descendants"
+                }
+                aria-hidden={current !== 0}
+              >
+                <Tap
+                  accessibilityRole="button"
+                  accessibilityLabel="Quero anunciar meu negócio"
+                  focusable={current === 0}
+                  style={styles.card}
+                  onPress={onAdvertise}
+                >
+                  <View style={styles.surface}>
+                    <ImageBackground
+                      source={announcementArtwork}
+                      style={[styles.letterbox, styles.adArtwork]}
+                      resizeMode="cover"
+                    >
+                      <View pointerEvents="none" style={styles.adShade} />
+                      <View style={styles.adBrand}>
+                        <Icon name="map-pin" color={c.yellow} size={13} />
+                        <Text style={styles.adLabel}>Vale, Serra e Mar</Text>
+                      </View>
+                      <Text style={styles.adTitle}>Seu negócio{"\n"}no mapa</Text>
+                    </ImageBackground>
+                    <View style={[styles.caption, styles.adCaption]}>
+                      <View style={styles.adAction}>
+                        <Text style={styles.adActionLabel}>Quero anunciar</Text>
+                        <Icon name="arrow-up-right" color={c.dark} size={16} />
+                      </View>
+                    </View>
+                  </View>
+                </Tap>
+              </View>
+            )}
             {businesses.map((business) => (
               <View key={business.id} style={[styles.slide, { width }]}>
                 <Tap
@@ -179,12 +227,57 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(15, 39, 31, 0.24)",
   },
+  adArtwork: {
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 17,
+    paddingVertical: 12,
+  },
+  adShade: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(8, 36, 29, 0.26)",
+  },
+  adBrand: { flexDirection: "row", alignItems: "center", gap: 5 },
+  adLabel: {
+    flexShrink: 1,
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    color: c.yellow,
+  },
+  adTitle: {
+    color: c.white,
+    fontSize: 24,
+    lineHeight: 27,
+    fontWeight: "800",
+    textShadowColor: "#102F28",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
+  },
   caption: {
     flexGrow: 1,
     justifyContent: "center",
     gap: 4,
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+  adCaption: { alignItems: "flex-start" },
+  adAction: {
+    minHeight: 40,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: "#F7CD70",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+  adActionLabel: {
+    flexShrink: 1,
+    color: c.dark,
+    fontSize: 13,
+    fontWeight: "700",
   },
   location: { flexDirection: "row", alignItems: "center", gap: 5 },
   city: { flexShrink: 1, fontSize: 13, lineHeight: 18, color: "#536D61" },

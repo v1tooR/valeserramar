@@ -103,10 +103,14 @@ it("mantém a etapa atual ao tocar em Anunciar durante o cadastro", async () => 
   expect(mockNavigate).not.toHaveBeenCalled();
 });
 
-async function renderCarousel(count = businesses.length) {
+async function renderCarousel(
+  count = businesses.length,
+  onAdvertise?: () => void,
+) {
   await act(async () => {
     tree = create(
       React.createElement(HighlightCarousel, {
+        onAdvertise,
         businesses: businesses.slice(0, count).map((business) => ({
           ...business,
           photo: `https://example.test/${business.id}.jpg`,
@@ -121,6 +125,39 @@ async function renderCarousel(count = businesses.length) {
   mockScrollTo.mockClear();
   return tree!.root;
 }
+
+it("mostra o anúncio antes dos estabelecimentos e inclui o slide na paginação", async () => {
+  jest.useFakeTimers();
+  const advertise = jest.fn();
+  const root = await renderCarousel(1, advertise);
+  const carousel = root.findByType(ScrollView);
+  const slides = carousel.findAllByProps({ accessibilityRole: "button" });
+  expect(slides.map(({ props }) => props.accessibilityLabel)).toEqual([
+    "Quero anunciar meu negócio",
+    `Abrir ${businesses[0].name}`,
+  ]);
+  expect(
+    root.findAllByType(Text).map(({ props }) => props.children),
+  ).toContainEqual([1, " de ", 2]);
+  await act(async () => slides[0].props.onPress());
+  expect(advertise).toHaveBeenCalledTimes(1);
+  await act(async () => jest.advanceTimersByTime(5000));
+  expect(mockScrollTo).toHaveBeenLastCalledWith({ x: 320, animated: true });
+  await act(async () => slides[1].props.onPress());
+  expect(mockNavigate).toHaveBeenCalledWith("Business", {
+    businessId: businesses[0].id,
+  });
+});
+
+it("exibe o anúncio mesmo quando a cidade não tem destaques", async () => {
+  const root = await renderCarousel(0, jest.fn());
+  expect(
+    root.findByProps({ accessibilityLabel: "Quero anunciar meu negócio" }),
+  ).toBeDefined();
+  expect(
+    root.findAllByProps({ accessibilityLabel: "Próximo destaque" }),
+  ).toHaveLength(0);
+});
 
 it("avança sozinho e permite voltar ou avançar nas duas extremidades", async () => {
   jest.useFakeTimers();

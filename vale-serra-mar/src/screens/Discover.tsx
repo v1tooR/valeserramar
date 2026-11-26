@@ -260,8 +260,10 @@ export function HomeScreen() {
       Number(state.interests.includes(a.segment)),
   );
   const highlights = highlightedBusinesses(local, "home");
+  const startAdvertising = () =>
+    nav.navigate(state.authenticated ? "BusinessWelcome" : "Advertise");
   return (
-    <Page brand tab="Home">
+    <Page brand tab="Home" onAdvertisePress={startAdvertising}>
       <View>
         <Text style={s.eyebrow}>Guia regional · {state.region}</Text>
         <Text style={s.title}>Descubra {state.city}</Text>
@@ -271,7 +273,7 @@ export function HomeScreen() {
         icon="search"
         onPress={() => nav.navigate("Search")}
       />
-      <HighlightCarousel businesses={highlights} />
+      <HighlightCarousel businesses={highlights} onAdvertise={startAdvertising} />
       <Section
         title="Categorias"
         action="Ver todas"
