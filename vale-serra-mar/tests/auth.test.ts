@@ -4,7 +4,10 @@ import { TextInput } from "react-native";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { Button, Chip, Icon } from "../src/components/ui";
 import type { AdvertiserPlanSelection } from "../src/domain/advertiserPlans";
+import { initialState } from "../src/domain/catalog";
+import type { State } from "../src/domain/models";
 import type { ScreenProps } from "../src/navigation";
+import { ProfileScreen } from "../src/screens/Discover";
 import { AdvertiseScreen, AuthScreen } from "../src/screens/OnboardingBusiness";
 import type { useStore } from "../src/store";
 
@@ -25,11 +28,13 @@ const signupRoute: ScreenProps["route"] = {
 const mockAuthenticate = jest.fn<ReturnType<typeof useStore>["authenticate"]>();
 const mockSaveDraft = jest.fn();
 const mockNavigate = jest.fn();
+const mockPopTo = jest.fn();
 const mockReplace = jest.fn();
 const mockReset = jest.fn();
+let mockState: State;
 jest.mock("../src/store", () => ({
   useStore: () => ({
-    state: { region: "Vale do Paraíba", city: "Caçapava" },
+    state: mockState,
     authenticate: mockAuthenticate,
     saveDraft: mockSaveDraft,
   }),
@@ -38,6 +43,7 @@ jest.mock("../src/store", () => ({
 jest.mock("../src/navigation", () => ({
   useNav: () => ({
     navigate: mockNavigate,
+    popTo: mockPopTo,
     replace: mockReplace,
     reset: mockReset,
     isFocused: () => true,
@@ -75,6 +81,7 @@ jest.mock("../src/components/ui", () => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockState = { ...initialState, region: "Vale do Paraíba", city: "Caçapava" };
   mockAuthenticate.mockResolvedValue(profile);
 });
 
@@ -113,6 +120,48 @@ it("entra na conta existente sem exigir a escolha de um plano", async () => {
     });
     expect(mockReplace).toHaveBeenCalledWith("Dashboard");
     expect(mockSaveDraft).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => tree.unmount());
+  }
+});
+
+it("cria conta a partir do Perfil e volta ao Perfil depois do cadastro", async () => {
+  let tree!: ReactTestRenderer;
+  await act(async () => {
+    tree = create(React.createElement(ProfileScreen));
+  });
+  const signupButton = () =>
+    tree.root.findAllByType(Button).find(({ props }) => props.title === "Criar conta");
+  const params = { signupFromProfile: true };
+  try {
+    await act(async () => signupButton()!.props.onPress());
+    expect(mockNavigate).toHaveBeenCalledWith("Auth", params);
+    await act(async () => {
+      tree.update(React.createElement(AuthScreen, {
+        route: { name: "Auth", key: "auth-profile", params },
+      }));
+    });
+    const field = (label: string) =>
+      tree.root.findAllByType(TextInput).find(
+        ({ props }) => props.accessibilityLabel === label,
+      )!;
+    await act(async () => {
+      field("Nome completo").props.onChangeText(profile.name);
+      field("Telefone com DDD").props.onChangeText(profile.phone);
+      field("E-mail").props.onChangeText(profile.email);
+      field("Senha").props.onChangeText("senha-de-teste");
+    });
+    await act(async () => signupButton()!.props.onPress());
+    expect(mockAuthenticate).toHaveBeenCalledWith("register", {
+      ...profile,
+      password: "senha-de-teste",
+    });
+    expect(mockPopTo).toHaveBeenCalledWith("Profile");
+    expect(mockSaveDraft).not.toHaveBeenCalled();
+
+    mockState = { ...mockState, authenticated: true, profile };
+    await act(async () => tree.update(React.createElement(ProfileScreen)));
+    expect(signupButton()).toBeUndefined();
   } finally {
     await act(async () => tree.unmount());
   }

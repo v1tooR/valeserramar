@@ -58,6 +58,7 @@ export type Params =
       preview?: boolean;
       advertiserPlanId?: AdvertiserPlanId;
       advertiserPlanSelection?: AdvertiserPlanSelection;
+      signupFromProfile?: boolean;
     }
   | undefined;
 export type Routes = { [K in ScreenName]: Params };

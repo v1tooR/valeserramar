@@ -89,7 +89,9 @@ export function AuthScreen({ route }: { route?: ScreenProps["route"] }) {
   const { authenticate, state, saveDraft } = useStore(),
     nav = useNav();
   const selection = route?.params?.advertiserPlanSelection;
-  const [create, setCreate] = useState(!!selection),
+  const fromProfile = route?.params?.signupFromProfile === true;
+  const canCreate = !!selection || fromProfile;
+  const [create, setCreate] = useState(canCreate),
     [name, setName] = useState(""),
     [email, setEmail] = useState(""),
     [phone, setPhone] = useState(""),
@@ -122,22 +124,28 @@ export function AuthScreen({ route }: { route?: ScreenProps["route"] }) {
         selection,
         profile.phone,
       );
+    } else if (fromProfile) {
+      nav.popTo("Profile");
     } else {
       nav.replace("Dashboard");
     }
   };
   return (
-    <Page title="Área do anunciante" keyboardAware>
-      <Text style={s.eyebrow}>Seu negócio, mais perto das pessoas</Text>
+    <Page title={fromProfile ? "Conta" : "Área do anunciante"} keyboardAware>
+      {!fromProfile && (
+        <Text style={s.eyebrow}>Seu negócio, mais perto das pessoas</Text>
+      )}
       <Text style={s.title}>
         {create ? "Crie sua conta" : "Bom ter você de volta"}
       </Text>
-      <Text style={s.muted}>
-        {create
-          ? "Preencha seus dados para continuar com o plano escolhido."
-          : "Entre para cuidar do seu negócio."}
-      </Text>
-      {selection && (
+      {!fromProfile && (
+        <Text style={s.muted}>
+          {create
+            ? "Preencha seus dados para continuar com o plano escolhido."
+            : "Entre para cuidar do seu negócio."}
+        </Text>
+      )}
+      {canCreate && (
         <View style={s.row}>
           <Chip
             title="Entrar"
@@ -198,9 +206,15 @@ export function AuthScreen({ route }: { route?: ScreenProps["route"] }) {
       />
       <Button
         secondary
-        title={selection ? "Voltar ao plano" : "Continuar explorando"}
+        title={
+          fromProfile
+            ? "Voltar ao perfil"
+            : selection
+              ? "Voltar ao plano"
+              : "Continuar explorando"
+        }
         onPress={() => {
-          if (selection) nav.goBack();
+          if (selection || fromProfile) nav.goBack();
           else if (state.region) nav.navigate("Home");
           else nav.popTo("Welcome");
         }}

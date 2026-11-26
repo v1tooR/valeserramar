@@ -862,6 +862,13 @@ export function ProfileScreen() {
           {state.profile?.name || "Olá, visitante!"}
         </Text>
         <Text style={s.muted}>Explore livremente · {state.city}</Text>
+        {!state.authenticated && (
+          <Button
+            title="Criar conta"
+            icon="user-plus"
+            onPress={() => nav.navigate("Auth", { signupFromProfile: true })}
+          />
+        )}
       </View>
       <Row
         title="Minhas reservas"
