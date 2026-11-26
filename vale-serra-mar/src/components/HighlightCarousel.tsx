@@ -1,5 +1,4 @@
-import { useIsFocused } from "@react-navigation/native";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import {
   Image,
   Platform,
@@ -12,8 +11,9 @@ import { photoSource } from "../assets";
 import type { Business } from "../domain/models";
 import { useNav } from "../navigation";
 import { colors as c, styles as s } from "../theme";
-import { Tap, useReducedMotion } from "./Motion";
+import { Tap } from "./Motion";
 import { Icon, Section } from "./ui";
+import { usePagedCarousel } from "./usePagedCarousel";
 
 const autoAdvanceMs = 5000;
 const bannerAspectRatio = 16 / 9;
@@ -60,69 +60,22 @@ function BannerImage({ photo }: { photo: Business["photo"] }) {
 
 export function HighlightCarousel({ businesses }: { businesses: Business[] }) {
   const nav = useNav();
-  const focused = useIsFocused();
-  const reducedMotion = useReducedMotion();
-  const track = useRef<React.ComponentRef<typeof ScrollView>>(null);
-  const [width, setWidth] = useState(0);
-  const [index, setIndex] = useState(0);
-  const [dragging, setDragging] = useState(false);
   const slides = businesses.map((business) => business.id).join(",");
   const count = businesses.length;
-  const current = Math.max(0, Math.min(index, count - 1));
-
-  useEffect(() => {
-    setIndex(0);
-    setDragging(false);
-    track.current?.scrollTo({ x: 0, animated: false });
-  }, [slides, width]);
-
-  const move = useCallback(
-    (step: number) => {
-      if (!width || count < 2) return;
-      const next = (current + step + count) % count;
-      track.current?.scrollTo({
-        x: next * width,
-        animated: !reducedMotion && Math.abs(next - current) === 1,
-      });
-      setIndex(next);
-    },
-    [count, current, reducedMotion, width],
+  const { current, move, width, onLayout, scrollProps } = usePagedCarousel(
+    count,
+    slides,
+    autoAdvanceMs,
   );
-
-  useEffect(() => {
-    if (!focused || reducedMotion || dragging || count < 2 || !width) return;
-    const timer = setTimeout(() => move(1), autoAdvanceMs);
-    return () => clearTimeout(timer);
-  }, [count, dragging, focused, move, reducedMotion, slides, width]);
 
   if (!count) return null;
 
   return (
     <View style={styles.section}>
       <Section title="Em destaque" />
-      <View onLayout={({ nativeEvent }) => setWidth(nativeEvent.layout.width)}>
+      <View onLayout={onLayout}>
         {width > 0 && (
-          <ScrollView
-            ref={track}
-            horizontal
-            pagingEnabled
-            bounces={false}
-            showsHorizontalScrollIndicator={false}
-            scrollEventThrottle={32}
-            onScrollBeginDrag={() => setDragging(true)}
-            onScrollEndDrag={() => setDragging(false)}
-            onScroll={({ nativeEvent }) => {
-              setIndex(
-                Math.max(
-                  0,
-                  Math.min(
-                    count - 1,
-                    Math.round(nativeEvent.contentOffset.x / width),
-                  ),
-                ),
-              );
-            }}
-          >
+          <ScrollView {...scrollProps}>
             {businesses.map((business) => (
               <View key={business.id} style={[styles.slide, { width }]}>
                 <Tap

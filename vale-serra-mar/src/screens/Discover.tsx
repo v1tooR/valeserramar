@@ -4,7 +4,6 @@ import { Tap as Pressable } from "../components/Motion";
 import React, { useMemo, useState } from "react";
 import {
   Image,
-  ImageBackground,
   ScrollView,
   StyleSheet,
   Text,
@@ -46,6 +45,7 @@ import {
 } from "../components/ui";
 import { BusinessCard } from "../components/BusinessCard";
 import { HighlightCarousel } from "../components/HighlightCarousel";
+import { HomeBannerCarousel } from "../components/HomeBannerCarousel";
 const welcomePhotos: Record<string, number> = {
   "Serra da Mantiqueira": require("../../assets/regiao-serra.png"),
   "Vale do Paraíba": require("../../assets/regiao-vale.png"),
@@ -261,8 +261,10 @@ export function HomeScreen() {
       Number(state.interests.includes(a.segment)),
   );
   const highlights = highlightedBusinesses(local, "home");
+  const startAdvertising = () =>
+    nav.navigate(state.authenticated ? "BusinessWelcome" : "Advertise");
   return (
-    <Page brand tab="Home">
+    <Page brand tab="Home" onAdvertisePress={startAdvertising}>
       <View>
         <Text style={s.eyebrow}>Guia regional · {state.region}</Text>
         <Text style={s.title}>Descubra {state.city}</Text>
@@ -272,31 +274,14 @@ export function HomeScreen() {
         icon="search"
         onPress={() => nav.navigate("Search")}
       />
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => nav.navigate("Results")}
-      >
-        <ImageBackground
-          source={
-            regions.find((r) => r.name === state.region)?.photo || assets.valley
-          }
-          style={{
-            width: "100%",
-            height: 210,
-            justifyContent: "flex-end",
-            overflow: "hidden",
-            borderRadius: 18,
-          }}
-          resizeMode="cover"
-          imageStyle={{ borderRadius: 18, width: "100%", height: "100%" }}
-        >
-          <View style={{ padding: 14, backgroundColor: "#104B38CC" }}>
-            <Text style={{ color: "white", fontSize: 17, fontWeight: "700" }}>
-              Ver estabelecimentos →
-            </Text>
-          </View>
-        </ImageBackground>
-      </Pressable>
+      <HomeBannerCarousel
+        region={state.region}
+        regionPhoto={
+          regions.find((r) => r.name === state.region)?.photo || assets.valley
+        }
+        onDiscover={() => nav.navigate("Results")}
+        onAdvertise={startAdvertising}
+      />
       <Section
         title="Categorias"
         action="Ver todas"

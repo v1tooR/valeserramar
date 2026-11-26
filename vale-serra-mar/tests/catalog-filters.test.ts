@@ -5,6 +5,7 @@ import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { BusinessCard } from "../src/components/BusinessCard";
 import { BusinessMap } from "../src/components/BusinessMap";
 import { HighlightCarousel } from "../src/components/HighlightCarousel";
+import { HomeBannerCarousel } from "../src/components/HomeBannerCarousel";
 import { Button, Chip } from "../src/components/ui";
 import {
   catalogFiltersFor,
@@ -242,6 +243,19 @@ it.each([HomeScreen, SearchScreen])(
     ]);
   },
 );
+
+it.each([
+  [false, "Advertise"],
+  [true, "BusinessWelcome"],
+])("carrossel do início abre a lista e o anúncio na sessão %s", async (authenticated, route) => {
+  mockState.authenticated = authenticated;
+  const root = await render(React.createElement(HomeScreen));
+  const banner = root.findByType(HomeBannerCarousel);
+  await act(async () => banner.props.onDiscover());
+  expect(mockNavigate).toHaveBeenLastCalledWith("Results");
+  await act(async () => banner.props.onAdvertise());
+  expect(mockNavigate).toHaveBeenLastCalledWith(route);
+});
 
 it("aplica as preferências na seleção e oferece acesso direto à lista", async () => {
   const root = await render(React.createElement(PreferencesScreen));
