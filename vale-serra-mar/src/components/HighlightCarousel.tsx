@@ -3,6 +3,7 @@ import {
   Image,
   ImageBackground,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,6 +20,7 @@ import { usePagedCarousel } from "./usePagedCarousel";
 
 const autoAdvanceMs = 5000;
 const bannerAspectRatio = 16 / 9;
+const dotTargetWidth = 24;
 const announcementArtwork: ImageSourcePropType = require("../../assets/inicio-anuncie.jpg");
 
 function BannerImage({ photo }: { photo: Business["photo"] }) {
@@ -71,13 +73,17 @@ export function HighlightCarousel({
   const nav = useNav();
   const slides = businesses.map((business) => business.id).join(",");
   const count = businesses.length + (onAdvertise ? 1 : 0);
-  const { current, move, width, onLayout, scrollProps } = usePagedCarousel(
+  const { current, goTo, width, onLayout, scrollProps } = usePagedCarousel(
     count,
     onAdvertise ? `advertise:${slides}` : slides,
     autoAdvanceMs,
   );
 
   if (!count) return null;
+
+  const maxDotsPerRow = Math.max(1, Math.floor(width / dotTargetWidth));
+  const dotRows = Math.ceil(count / maxDotsPerRow);
+  const paginationWidth = Math.ceil(count / dotRows) * dotTargetWidth;
 
   return (
     <View style={styles.section}>
@@ -155,32 +161,28 @@ export function HighlightCarousel({
             ))}
           </ScrollView>
         )}
+        {width > 0 && count > 1 && (
+          <View style={[styles.pagination, { width: paginationWidth }]}>
+            {Array.from({ length: count }, (_, index) => (
+              <Pressable
+                key={index}
+                accessibilityRole="button"
+                accessibilityLabel={`Mostrar slide ${index + 1} de ${count}`}
+                accessibilityState={{ selected: current === index }}
+                style={({ pressed }) => [
+                  styles.dotTarget,
+                  pressed && styles.dotPressed,
+                ]}
+                onPress={() => goTo(index)}
+              >
+                <View
+                  style={[styles.dot, current === index && styles.activeDot]}
+                />
+              </Pressable>
+            ))}
+          </View>
+        )}
       </View>
-      {count > 1 && (
-        <View style={styles.controls}>
-          <Tap
-            accessibilityRole="button"
-            accessibilityLabel="Destaque anterior"
-            disabled={!width}
-            style={styles.arrow}
-            onPress={() => move(-1)}
-          >
-            <Icon name="chevron-left" size={20} />
-          </Tap>
-          <Text style={styles.counter}>
-            {current + 1} de {count}
-          </Text>
-          <Tap
-            accessibilityRole="button"
-            accessibilityLabel="Próximo destaque"
-            disabled={!width}
-            style={styles.arrow}
-            onPress={() => move(1)}
-          >
-            <Icon name="chevron-right" size={20} />
-          </Tap>
-        </View>
-      )}
     </View>
   );
 }
@@ -281,32 +283,32 @@ const styles = StyleSheet.create({
   },
   location: { flexDirection: "row", alignItems: "center", gap: 5 },
   city: { flexShrink: 1, fontSize: 13, lineHeight: 18, color: "#536D61" },
-  controls: {
+  pagination: {
+    alignSelf: "center",
     flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    marginTop: -6,
+  },
+  dotTarget: {
+    width: dotTargetWidth,
+    height: 36,
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
   },
-  counter: {
-    minWidth: 64,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: c.soft,
-    color: c.dark,
-    fontSize: 13,
-    fontWeight: "600",
-    fontVariant: ["tabular-nums"],
-    textAlign: "center",
+  dotPressed: { opacity: 0.55 },
+  dot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: c.muted,
   },
-  arrow: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: c.border,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: c.white,
+  activeDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 3,
+    borderColor: c.mint,
+    backgroundColor: c.green,
   },
 });

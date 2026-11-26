@@ -45,13 +45,6 @@ export function usePagedCarousel(
     [count, current, reducedMotion, width],
   );
 
-  const move = useCallback(
-    (step: number) => {
-      if (count > 1) goTo((current + step + count) % count);
-    },
-    [count, current, goTo],
-  );
-
   useEffect(() => {
     if (
       !interval ||
@@ -62,15 +55,16 @@ export function usePagedCarousel(
       !width
     )
       return;
-    const timer = setTimeout(() => move(1), interval);
+    const timer = setTimeout(() => goTo((current + 1) % count), interval);
     return () => clearTimeout(timer);
   }, [
     contentKey,
     count,
+    current,
     dragging,
     focused,
+    goTo,
     interval,
-    move,
     reducedMotion,
     width,
   ]);
@@ -79,7 +73,6 @@ export function usePagedCarousel(
     current,
     width,
     goTo,
-    move,
     onLayout: ({ nativeEvent }: LayoutChangeEvent) =>
       setWidth(nativeEvent.layout.width),
     scrollProps: {

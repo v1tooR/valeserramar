@@ -5,11 +5,17 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { act, create, type ReactTestRenderer } from "react-test-renderer";
+import {
+  act,
+  create,
+  type ReactTestInstance,
+  type ReactTestRenderer,
+} from "react-test-renderer";
 import { HighlightCarousel } from "../src/components/HighlightCarousel";
 import { AdvertiserRegistrationContext, Field, Page } from "../src/components/ui";
 import { AuthScreen } from "../src/screens/OnboardingBusiness";
@@ -103,15 +109,25 @@ it("mantém a etapa atual ao tocar em Anunciar durante o cadastro", async () => 
   expect(mockNavigate).not.toHaveBeenCalled();
 });
 
+const singleBusiness = businesses.slice(0, 1);
+const carouselDots = (root: ReactTestInstance) =>
+  root.findAll(
+    ({ props }) =>
+      typeof props.onPress === "function" &&
+      typeof props.accessibilityLabel === "string" &&
+      props.accessibilityLabel.startsWith("Mostrar slide "),
+  );
+
 async function renderCarousel(
-  count = businesses.length,
+  featured = businesses,
   onAdvertise?: () => void,
+  width = 320,
 ) {
   await act(async () => {
     tree = create(
       React.createElement(HighlightCarousel, {
         onAdvertise,
-        businesses: businesses.slice(0, count).map((business) => ({
+        businesses: featured.map((business) => ({
           ...business,
           photo: `https://example.test/${business.id}.jpg`,
         })),
@@ -121,28 +137,32 @@ async function renderCarousel(
   const viewport = tree!.root
     .findAllByType(View)
     .find((view) => view.props.onLayout)!;
-  await act(async () => viewport.props.onLayout(layout(320, 180)));
+  await act(async () => viewport.props.onLayout(layout(width, 180)));
   mockScrollTo.mockClear();
   return tree!.root;
 }
 
 it("mostra o anúncio antes dos estabelecimentos e inclui o slide na paginação", async () => {
-  jest.useFakeTimers();
   const advertise = jest.fn();
-  const root = await renderCarousel(1, advertise);
+  const root = await renderCarousel(singleBusiness, advertise);
   const carousel = root.findByType(ScrollView);
   const slides = carousel.findAllByProps({ accessibilityRole: "button" });
+  const dots = carouselDots(root);
   expect(slides.map(({ props }) => props.accessibilityLabel)).toEqual([
     "Quero anunciar meu negócio",
     `Abrir ${businesses[0].name}`,
   ]);
-  expect(
-    root.findAllByType(Text).map(({ props }) => props.children),
-  ).toContainEqual([1, " de ", 2]);
+  expect(dots.map(({ props }) => props.accessibilityLabel)).toEqual([
+    "Mostrar slide 1 de 2",
+    "Mostrar slide 2 de 2",
+  ]);
+  expect(dots[0].props.accessibilityState.selected).toBe(true);
   await act(async () => slides[0].props.onPress());
   expect(advertise).toHaveBeenCalledTimes(1);
-  await act(async () => jest.advanceTimersByTime(5000));
+  await act(async () => dots[1].props.onPress());
   expect(mockScrollTo).toHaveBeenLastCalledWith({ x: 320, animated: true });
+  expect(dots[1].props.accessibilityState.selected).toBe(true);
+  expect(dots[0].props.accessibilityState.selected).toBe(false);
   await act(async () => slides[1].props.onPress());
   expect(mockNavigate).toHaveBeenCalledWith("Business", {
     businessId: businesses[0].id,
@@ -150,16 +170,14 @@ it("mostra o anúncio antes dos estabelecimentos e inclui o slide na paginação
 });
 
 it("exibe o anúncio mesmo quando a cidade não tem destaques", async () => {
-  const root = await renderCarousel(0, jest.fn());
+  const root = await renderCarousel([], jest.fn());
   expect(
     root.findByProps({ accessibilityLabel: "Quero anunciar meu negócio" }),
   ).toBeDefined();
-  expect(
-    root.findAllByProps({ accessibilityLabel: "Próximo destaque" }),
-  ).toHaveLength(0);
+  expect(carouselDots(root)).toHaveLength(0);
 });
 
-it("avança sozinho e permite voltar ou avançar nas duas extremidades", async () => {
+it("sincroniza a seleção das bolinhas com a rotação automática e o gesto de arrastar", async () => {
   jest.useFakeTimers();
   const root = await renderCarousel();
   const captions = root.findAllByType(Text).map(({ props }) => props.children);
@@ -176,20 +194,41 @@ it("avança sozinho e permite voltar ou avançar nas duas extremidades", async (
   expect(mockNavigate).toHaveBeenCalledWith("Business", {
     businessId: businesses[0].id,
   });
-  const previous = root.findByProps({
-    accessibilityLabel: "Destaque anterior",
+  const dots = carouselDots(root);
+  expect(dots[0].props.accessibilityState.selected).toBe(true);
+  await act(async () => jest.advanceTimersByTime(5000));
+  expect(mockScrollTo).toHaveBeenLastCalledWith({ x: 320, animated: true });
+  expect(dots[1].props.accessibilityState.selected).toBe(true);
+  await act(async () => jest.advanceTimersByTime(5000));
+  expect(mockScrollTo).toHaveBeenLastCalledWith({ x: 0, animated: true });
+  expect(dots[0].props.accessibilityState.selected).toBe(true);
+  await act(async () =>
+    root.findByType(ScrollView).props.onScroll({
+      nativeEvent: { contentOffset: { x: 320 } },
+    }),
+  );
+  expect(dots[1].props.accessibilityState.selected).toBe(true);
+});
+
+it("distribui os 16 marcadores em duas linhas em uma tela estreita", async () => {
+  const featured = Array.from({ length: 15 }, (_, index) => ({
+    ...businesses[index % businesses.length],
+    id: `destaque-${index}`,
+  }));
+  const width = 280;
+  const root = await renderCarousel(featured, jest.fn(), width);
+  const dots = carouselDots(root);
+  expect(dots).toHaveLength(16);
+  const targetStyle = StyleSheet.flatten(dots[0].props.style({ pressed: false }));
+  const pagination = StyleSheet.flatten(dots[0].parent!.props.style);
+  expect(pagination.width / targetStyle.width).toBe(8);
+  expect(pagination.width).toBeLessThanOrEqual(width);
+  await act(async () => dots[15].props.onPress());
+  expect(mockScrollTo).toHaveBeenLastCalledWith({
+    x: 15 * width,
+    animated: false,
   });
-  const next = root.findByProps({ accessibilityLabel: "Próximo destaque" });
-  expect(previous.props.disabled).toBe(false);
-  expect(next.props.disabled).toBe(false);
-  await act(async () => jest.advanceTimersByTime(5000));
-  expect(mockScrollTo).toHaveBeenLastCalledWith({ x: 320, animated: true });
-  await act(async () => next.props.onPress());
-  expect(mockScrollTo).toHaveBeenLastCalledWith({ x: 0, animated: true });
-  await act(async () => previous.props.onPress());
-  expect(mockScrollTo).toHaveBeenLastCalledWith({ x: 320, animated: true });
-  await act(async () => jest.advanceTimersByTime(5000));
-  expect(mockScrollTo).toHaveBeenLastCalledWith({ x: 0, animated: true });
+  expect(dots[15].props.accessibilityState.selected).toBe(true);
 });
 
 it.each([
@@ -200,7 +239,7 @@ it.each([
 ])(
   "preenche o fundo do banner de %i por %i quando sobram bordas",
   async (width, height, fill) => {
-    const root = await renderCarousel(1);
+    const root = await renderCarousel(singleBusiness);
     await act(async () => {
       root
         .findByType(Image)
@@ -218,7 +257,7 @@ it.each([
 );
 
 it("preenche o fundo também quando a plataforma não informa as dimensões", async () => {
-  const root = await renderCarousel(1);
+  const root = await renderCarousel(singleBusiness);
   await act(async () =>
     root.findByType(Image).props.onLoad({ nativeEvent: {} }),
   );
@@ -239,15 +278,10 @@ it("pausa a rotação enquanto o usuário arrasta o carrossel", async () => {
   expect(mockScrollTo).toHaveBeenLastCalledWith({ x: 320, animated: true });
 });
 
-it("mantém um único banner sem setas ou rotação", async () => {
+it("mantém um único banner sem paginação ou rotação", async () => {
   jest.useFakeTimers();
-  const root = await renderCarousel(1);
-  expect(
-    root.findAllByProps({ accessibilityLabel: "Destaque anterior" }),
-  ).toHaveLength(0);
-  expect(
-    root.findAllByProps({ accessibilityLabel: "Próximo destaque" }),
-  ).toHaveLength(0);
+  const root = await renderCarousel(singleBusiness);
+  expect(carouselDots(root)).toHaveLength(0);
   await act(async () => jest.advanceTimersByTime(10000));
   expect(mockScrollTo).not.toHaveBeenCalled();
 });
