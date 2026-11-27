@@ -9,6 +9,7 @@ import type {
 } from "@react-navigation/native-stack";
 export type ScreenName =
   | "Welcome"
+  | "ChooseCity"
   | "Home"
   | "Search"
   | "Results"
@@ -59,6 +60,8 @@ export type Params =
       advertiserPlanId?: AdvertiserPlanId;
       advertiserPlanSelection?: AdvertiserPlanSelection;
       signupFromProfile?: boolean;
+      locationRegion?: string;
+      changeLocation?: boolean;
     }
   | undefined;
 export type Routes = { [K in ScreenName]: Params };

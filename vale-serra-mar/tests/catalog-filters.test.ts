@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, jest } from "@jest/globals";
 import React from "react";
-import { TextInput } from "react-native";
+import { TextInput, View } from "react-native";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { BusinessCard } from "../src/components/BusinessCard";
 import { BusinessMap } from "../src/components/BusinessMap";
@@ -14,6 +14,7 @@ import {
 import type { Business, CatalogFilters, State } from "../src/domain/models";
 import type { ScreenProps } from "../src/navigation";
 import { MapScreen } from "../src/screens/Business";
+import { ChooseCityScreen } from "../src/screens/ChooseCity";
 import {
   HomeScreen,
   PreferencesScreen,
@@ -22,6 +23,7 @@ import {
 } from "../src/screens/Discover";
 
 const mockNavigate = jest.fn();
+const mockGoBack = jest.fn();
 let mockState: State;
 const mockUpdate = jest.fn((change: (state: State) => State) => {
   mockState = change(mockState);
@@ -39,7 +41,7 @@ jest.mock("react-native-safe-area-context", () => ({
   SafeAreaView: ({ children }: React.PropsWithChildren) => children,
 }));
 jest.mock("../src/navigation", () => ({
-  useNav: () => ({ navigate: mockNavigate }),
+  useNav: () => ({ navigate: mockNavigate, goBack: mockGoBack }),
 }));
 jest.mock("../src/store", () => ({
   useStore: () => ({
@@ -99,6 +101,7 @@ beforeEach(() => {
     ],
   };
   mockNavigate.mockClear();
+  mockGoBack.mockClear();
   mockUpdate.mockClear();
   mockSetCatalogFilters.mockClear();
 });
@@ -135,6 +138,22 @@ async function select(title: string) {
     chip!.props.onPress();
     renderCurrent();
   });
+}
+
+async function confirmCity(locationRegion: string, city: string) {
+  const params = { locationRegion, changeLocation: true };
+  expect(mockNavigate).toHaveBeenCalledWith("ChooseCity", params);
+  const props = { route: { name: "ChooseCity", params } } as ScreenProps;
+  await act(async () => tree!.update(React.createElement(ChooseCityScreen, props)));
+  const root = tree!.root;
+  const viewport = root.findAllByType(View).find(({ props }) => props.testID === "city-carousel")!;
+  await act(async () => viewport.props.onLayout({ nativeEvent: { layout: { width: 340 } } }));
+  const dot = root.findAllByProps({ accessibilityLabel: `Mostrar ${city}` })[0];
+  await act(async () => dot.props.onPress());
+  const confirm = root.findByType(Button);
+  expect(confirm.props.title).toBe("Confirmar cidade");
+  await act(async () => confirm.props.onPress());
+  expect(mockGoBack).toHaveBeenCalledTimes(1);
 }
 
 it("mantém a busca ao vivo na cidade selecionada e permite buscar em todas as regiões", async () => {
@@ -209,7 +228,7 @@ it("abre o mapa em Santo Antônio do Pinhal mesmo sem pinos na cidade", async ()
   mockState.businesses.push(campos);
   await render(React.createElement(PreferencesScreen));
   await select("Serra da Mantiqueira");
-  await select("Santo Antônio do Pinhal");
+  await confirmCity(campos.region, "Santo Antônio do Pinhal");
   await act(async () => tree!.update(React.createElement(MapScreen)));
   expect(tree!.root.findByType(BusinessMap).props).toMatchObject({
     city: "Santo Antônio do Pinhal",
@@ -271,14 +290,20 @@ it("mostra as 15 vagas de cada área separadamente e posiciona os destaques ante
 });
 
 it("aplica as preferências na seleção e oferece acesso direto à lista", async () => {
-  const root = await render(React.createElement(PreferencesScreen));
+  mockState.catalogFilters = {
+    ...catalogFiltersFor(mockState),
+    district: local.district,
+    segment: "Alimentação",
+  };
+  await render(React.createElement(PreferencesScreen));
   await select(coast.region);
+  expect(mockState.city).toBe(local.city);
+  expect(mockUpdate).not.toHaveBeenCalled();
+  await confirmCity(coast.region, coast.city);
   expect(mockState.region).toBe(coast.region);
-  await act(async () => tree!.update(React.createElement(PreferencesScreen)));
-  await select(coast.city);
   expect(mockState.city).toBe(coast.city);
   await act(async () => tree!.update(React.createElement(PreferencesScreen)));
-  const button = root
+  const button = tree!.root
     .findAllByType(Button)
     .find(({ props }) => props.title === "Ver estabelecimentos")!;
   await act(async () => button.props.onPress());
@@ -286,5 +311,7 @@ it("aplica as preferências na seleção e oferece acesso direto à lista", asyn
   expect(catalogFiltersFor(mockState)).toMatchObject({
     region: coast.region,
     city: coast.city,
+    district: "",
+    segment: "Alimentação",
   });
 });

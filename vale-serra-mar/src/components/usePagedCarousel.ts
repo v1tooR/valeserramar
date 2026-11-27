@@ -6,32 +6,45 @@ import {
   useState,
   type ComponentRef,
 } from "react";
-import type {
-  LayoutChangeEvent,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  ScrollView,
+import {
+  Platform,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type ScrollView,
+  type ScrollViewProps,
+  type ViewStyle,
 } from "react-native";
 import { useReducedMotion } from "./Motion";
+
+type CarouselOptions = {
+  interval?: number;
+  initialIndex?: number;
+  sideInset?: number;
+};
 
 export function usePagedCarousel(
   count: number,
   contentKey: string,
-  interval?: number,
+  { interval, initialIndex = 0, sideInset = 0 }: CarouselOptions = {},
 ) {
   const focused = useIsFocused();
   const reducedMotion = useReducedMotion();
   const track = useRef<ComponentRef<typeof ScrollView>>(null);
-  const [width, setWidth] = useState(0);
-  const [index, setIndex] = useState(0);
+  const [viewport, setViewport] = useState(0);
+  const inset = Math.min(sideInset, Math.max(0, (viewport - 180) / 2));
+  const width = viewport - 2 * inset;
+  const end = Math.max(0, count - 1);
+  const first = Math.max(0, Math.min(initialIndex, end));
+  const [index, setIndex] = useState(first);
   const [dragging, setDragging] = useState(false);
-  const current = Math.max(0, Math.min(index, count - 1));
+  const current = Math.max(0, Math.min(index, end));
 
   useEffect(() => {
-    setIndex(0);
+    setIndex(first);
     setDragging(false);
-    track.current?.scrollTo({ x: 0, animated: false });
-  }, [contentKey, width]);
+    track.current?.scrollTo({ x: first * width, animated: false });
+  }, [contentKey, first, width]);
 
   const goTo = useCallback(
     (next: number) => {
@@ -69,16 +82,34 @@ export function usePagedCarousel(
     width,
   ]);
 
+  // RN Web snaps the wrapped children using CSS. The inset keeps each card centered.
+  const pagination: ScrollViewProps = inset
+    ? {
+        contentContainerStyle: { paddingHorizontal: inset },
+        ...(Platform.OS === "web"
+          ? {
+              pagingEnabled: true,
+              style: { scrollPaddingInline: `${inset}px` } as ViewStyle,
+            }
+          : {
+              snapToInterval: width,
+              decelerationRate: "fast",
+              disableIntervalMomentum: true,
+              overScrollMode: "never",
+            }),
+      }
+    : { pagingEnabled: true };
+
   return {
     current,
     width,
     goTo,
     onLayout: ({ nativeEvent }: LayoutChangeEvent) =>
-      setWidth(nativeEvent.layout.width),
+      setViewport(nativeEvent.layout.width),
     scrollProps: {
       ref: track,
       horizontal: true,
-      pagingEnabled: true,
+      ...pagination,
       bounces: false,
       showsHorizontalScrollIndicator: false,
       scrollEventThrottle: 32,
@@ -89,10 +120,7 @@ export function usePagedCarousel(
         setIndex(
           Math.max(
             0,
-            Math.min(
-              count - 1,
-              Math.round(nativeEvent.contentOffset.x / width),
-            ),
+            Math.min(end, Math.round(nativeEvent.contentOffset.x / width)),
           ),
         );
       },

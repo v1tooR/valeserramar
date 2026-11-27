@@ -11,7 +11,7 @@ export const regions = [
       "Cunha",
       "Paraibuna",
     ],
-    photo: assets.valley,
+    photo: assets.regionValley,
   },
   {
     name: "Serra da Mantiqueira",
@@ -21,12 +21,12 @@ export const regions = [
       "São Bento do Sapucaí",
       "Monteiro Lobato",
     ],
-    photo: assets.mountain,
+    photo: assets.regionMountain,
   },
   {
     name: "Litoral Norte",
     cities: ["Ubatuba", "Caraguatatuba", "Ilhabela", "São Sebastião"],
-    photo: assets.landscape,
+    photo: assets.regionCoast,
   },
 ];
 export const cityKey = (city: string) =>
@@ -60,6 +60,27 @@ export function catalogFiltersFor({
 }: State): CatalogFilters {
   if (catalogFilters) return catalogFilters;
   return { ...emptyCatalogFilters, city, region: regionForCity(city) ?? region };
+}
+
+export function visitCity(state: State, city: string): State {
+  const region = regionForCity(city);
+  if (!region) return state;
+  return {
+    ...state,
+    region,
+    city,
+    catalogFilters: state.catalogFilters
+      ? {
+          ...state.catalogFilters,
+          region,
+          city,
+          district:
+            cityKey(state.catalogFilters.city) === cityKey(city)
+              ? state.catalogFilters.district
+              : "",
+        }
+      : null,
+  };
 }
 
 export const segments: Segment[] = [

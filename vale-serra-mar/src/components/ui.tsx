@@ -77,6 +77,7 @@ export function Button({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={title}
       accessibilityState={{ disabled: disabled || loading }}
       disabled={disabled || loading}
       onPress={onPress}
@@ -100,6 +101,7 @@ export function Button({
               fontSize: 15,
               fontWeight: "700",
               textAlign: "center",
+              flexShrink: 1,
             }}
           >
             {title}

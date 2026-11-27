@@ -45,15 +45,12 @@ import {
 } from "../components/ui";
 import { BusinessCard } from "../components/BusinessCard";
 import { HighlightCarousel } from "../components/HighlightCarousel";
-const welcomePhotos: Record<string, number> = {
-  "Serra da Mantiqueira": require("../../assets/regiao-serra.png"),
-  "Vale do Paraíba": require("../../assets/regiao-vale.png"),
-  "Litoral Norte": require("../../assets/regiao-litoral.png"),
-};
 export function WelcomeScreen() {
-  const { state, update } = useStore(),
+  const { state } = useStore(),
     nav = useNav();
-  const [region, setRegion] = useState(state.region || regions[0].name);
+  const [region, setRegion] = useState(
+    regions.find(({ name }) => name === state.region)?.name ?? regions[0].name,
+  );
   return (
     <Page
       title="Escolha sua região"
@@ -62,16 +59,9 @@ export function WelcomeScreen() {
       footer={
         <>
           <Button
-            title="Começar a explorar"
+            title="Escolher cidade"
             icon="arrow-right"
-            onPress={() => {
-              update((s) => ({
-                ...s,
-                region,
-                city: regions.find((r) => r.name === region)!.cities[0],
-              }));
-              nav.reset({ index: 0, routes: [{ name: "Home" }] });
-            }}
+            onPress={() => nav.navigate("ChooseCity", { locationRegion: region })}
           />
           <Text style={[s.muted, { textAlign: "center", fontSize: 12 }]}>
             Grátis para explorar. Sem precisar de conta.
@@ -121,7 +111,7 @@ export function WelcomeScreen() {
             ]}
           >
             <Image
-              source={welcomePhotos[r.name]}
+              source={r.photo}
               style={{ width: 58, height: 58, borderRadius: 12, flexShrink: 0 }}
               resizeMode="cover"
             />
@@ -777,30 +767,8 @@ export function PreferencesScreen() {
     nav = useNav();
   const region =
     regions.find((item) => item.name === state.region) ?? regions[0];
-  const city = region.cities.includes(state.city)
-    ? state.city
-    : region.cities[0];
-  const chooseLocation = (region: (typeof regions)[number], city?: string) => {
-    update((current) => {
-      const nextCity =
-        city ??
-        (region.cities.includes(current.city)
-          ? current.city
-          : region.cities[0]);
-      return {
-        ...current,
-        region: region.name,
-        city: nextCity,
-        catalogFilters: current.catalogFilters
-          ? {
-              ...current.catalogFilters,
-              region: region.name,
-              city: nextCity,
-            }
-          : null,
-      };
-    });
-  };
+  const chooseLocation = (locationRegion: string) =>
+    nav.navigate("ChooseCity", { locationRegion, changeLocation: true });
   return (
     <Page
       title="Região e interesses"
@@ -817,20 +785,16 @@ export function PreferencesScreen() {
           key={r.name}
           title={r.name}
           selected={r.name === region.name}
-          onPress={() => chooseLocation(r)}
+          onPress={() => chooseLocation(r.name)}
         />
       ))}
       <Section title="Cidade" />
-      <View style={s.wrap}>
-        {region.cities.map((name) => (
-          <Chip
-            key={name}
-            title={name}
-            selected={name === city}
-            onPress={() => chooseLocation(region, name)}
-          />
-        ))}
-      </View>
+      <Row
+        title={state.city || "Escolher cidade"}
+        subtitle={state.city ? "Trocar cidade" : undefined}
+        icon="map-pin"
+        onPress={() => chooseLocation(region.name)}
+      />
       <Section title="O que você gosta de explorar?" />
       <Text style={s.muted}>Escolha quantas opções quiser.</Text>
       <View style={s.wrap}>
@@ -928,8 +892,8 @@ export function HelpScreen() {
       <Text style={s.title}>Como podemos ajudar?</Text>
       <Section title="Explore sem criar conta" />
       <Text style={s.body}>
-        Escolha sua região para encontrar estabelecimentos, consultar cardápios
-        e conhecer os serviços disponíveis.
+        Escolha sua região e cidade para encontrar estabelecimentos, consultar
+        cardápios e conhecer os serviços disponíveis.
       </Text>
       <Section title="Reservas com confirmação" />
       <Text style={s.body}>

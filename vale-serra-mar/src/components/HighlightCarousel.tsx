@@ -88,7 +88,7 @@ export function HighlightCarousel({
   const { current, goTo, width, onLayout, scrollProps } = usePagedCarousel(
     count,
     onAdvertise ? `advertise:${slides}` : slides,
-    autoAdvanceMs,
+    { interval: autoAdvanceMs },
   );
 
   if (!count) return null;
