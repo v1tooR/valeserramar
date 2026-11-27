@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdtemp, rm } from "node:fs/promises";
+import { access, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -19,7 +19,7 @@ import {
   workspaceSchema,
 } from "../src/schemas.js";
 
-test("API com PostgreSQL: contrato, isolamento, aprovação, mídia e reservas", async () => {
+test("API com PostgreSQL: contrato, isolamento, aprovação, mídia e reservas", async (t) => {
   const temp = await mkdtemp(join(tmpdir(), "vsm-api-"));
   const url = "https://api.example.test";
   const port = Number(process.env.TEST_PG_PORT || "55434");
@@ -573,6 +573,40 @@ test("API com PostgreSQL: contrato, isolamento, aprovação, mídia e reservas",
     assert.equal(reserved.estimate, 299.9);
     assert.equal(reserved.roomName, room.name);
     assert.equal(reserved.status, "Pendente");
+
+    await t.test("exclui somente a própria conta após confirmar a senha", async () => {
+      const auth = { body: { email: body.email, password: body.password } };
+      const { token: anotherSession } = await send("POST", "/auth/login", auth);
+      const { id: ownerId } = (await db.query("SELECT id FROM vsm.accounts WHERE email=$1", [body.email])).rows[0];
+      const ownerMedia = new URL(photo).pathname;
+      const outsider = await send("POST", "/media", { token: second, body: upload(png), headers, status: 201 });
+      const deletion = { body: { password: body.password } };
+      await send("DELETE", "/me", { ...deletion, guest, status: 401 });
+      const incorrect = await send("DELETE", "/me", {
+        token, body: { password: "senha-incorreta" }, status: 403,
+      });
+      assert.match(incorrect.message, /Senha incorreta/);
+      assert.equal((await send("GET", "/me", { token })).email, body.email);
+      assert.equal((await send("GET", "/catalog")).businesses.length, approved.length);
+
+      await send("DELETE", "/me", { ...deletion, token, status: 204 });
+      await send("GET", "/me", { token, status: 401 });
+      await send("GET", "/me", { token: anotherSession, status: 401 });
+      await send("POST", "/auth/login", { ...auth, status: 401 });
+      assert.equal((await send("GET", "/me", { token: second })).email, "other@example.test");
+      assert.deepEqual(await send("GET", "/catalog"), { businesses: [], products: [] });
+      await send("GET", ownerMedia, { status: 404 });
+      await send("GET", new URL(outsider.url).pathname);
+      await assert.rejects(access(join(temp, "media", ownerMedia.split("/").at(-1) + ".webp")), { code: "ENOENT" });
+      const stored = await db.query("SELECT id,owner_id,data FROM vsm.businesses ORDER BY id");
+      assert.equal(stored.rows.length, 2);
+      assert.ok(stored.rows.every(({ owner_id, data }) => owner_id === null && data.name === "Estabelecimento removido"));
+      assert.equal((await db.query("SELECT count(*)::int AS count FROM vsm.requests WHERE scope LIKE $1", [ownerId + ":%"])).rows[0].count, 0);
+      const history = await send("GET", "/reservations", { guest });
+      assert.ok(history.some(({ id }) => id === r.id));
+      assert.ok(history.some(({ id }) => id === reserved.id));
+      await send("POST", "/auth/register", { body, status: 201 });
+    });
   } finally {
     await app?.close();
     await db?.end();

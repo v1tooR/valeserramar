@@ -25,6 +25,8 @@ export type ScreenName =
   | "BookingDetail"
   | "Reservations"
   | "Profile"
+  | "Settings"
+  | "DeleteAccount"
   | "Preferences"
   | "Favorites"
   | "Advertise"
@@ -60,6 +62,7 @@ export type Params =
       advertiserPlanId?: AdvertiserPlanId;
       advertiserPlanSelection?: AdvertiserPlanSelection;
       signupFromProfile?: boolean;
+      authFromSettings?: boolean;
       locationRegion?: string;
       changeLocation?: boolean;
     }

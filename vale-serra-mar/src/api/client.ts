@@ -35,8 +35,12 @@ export async function restoreTokens() {
   return Boolean(accessToken);
 }
 export async function setAccessToken(token: string) {
-  if (token) await vault.set(accessKey, token);
-  else await vault.remove(accessKey);
+  if (!token) {
+    accessToken = "";
+    await vault.remove(accessKey);
+    return;
+  }
+  await vault.set(accessKey, token);
   accessToken = token;
 }
 export async function request<T>(

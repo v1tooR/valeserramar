@@ -108,7 +108,11 @@ export function ChooseCityScreen({ route }: ScreenProps) {
               <Text style={styles.regionLabel}>{region.name}</Text>
             </View>
           </ImageBackground>
-          <View testID="city-carousel" onLayout={onLayout} style={styles.viewport}>
+          <View
+            testID="city-carousel"
+            onLayout={onLayout}
+            style={styles.viewport}
+          >
             {width > 0 && (
               <ScrollView {...scrollProps} keyboardShouldPersistTaps="handled">
                 {cities.map((name, index) => {
@@ -162,24 +166,44 @@ export function ChooseCityScreen({ route }: ScreenProps) {
             )}
           </View>
           <View style={styles.pagination}>
-            {cities.map((name, index) => (
-              <Tap
-                key={name}
-                accessibilityRole="button"
-                accessibilityLabel={`Mostrar ${name}`}
-                accessibilityState={{ selected: current === index }}
-                onPress={() => goTo(index)}
-                style={styles.dotTarget}
-              >
-                <View
-                  style={[styles.dot, current === index && styles.dotActive]}
-                />
-              </Tap>
-            ))}
+            <Tap
+              accessibilityRole="button"
+              accessibilityLabel="Cidade anterior"
+              disabled={!width || current === 0}
+              onPress={() => goTo(current - 1)}
+              style={styles.arrow}
+            >
+              <Icon name="chevron-left" size={22} />
+            </Tap>
+            <View style={styles.dots}>
+              {cities.map((name, index) => (
+                <Tap
+                  key={name}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Mostrar ${name}`}
+                  accessibilityState={{ selected: current === index }}
+                  onPress={() => goTo(index)}
+                  style={styles.dotTarget}
+                >
+                  <View
+                    style={[styles.dot, current === index && styles.dotActive]}
+                  />
+                </Tap>
+              ))}
+            </View>
+            <Tap
+              accessibilityRole="button"
+              accessibilityLabel="Próxima cidade"
+              disabled={!width || current === cities.length - 1}
+              onPress={() => goTo(current + 1)}
+              style={styles.arrow}
+            >
+              <Icon name="chevron-right" size={22} />
+            </Tap>
           </View>
         </View>
         <Text style={styles.hint}>
-          Deslize ou toque nas bolinhas para ver as cidades.
+          Deslize ou use as setas para trocar de cidade.
         </Text>
       </ScrollView>
     </Page>
@@ -275,11 +299,29 @@ const styles = StyleSheet.create({
   cityDetail: { fontSize: 12, lineHeight: 16, color: "#50665C" },
   pagination: {
     flexDirection: "row",
-    flexWrap: "wrap",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  dots: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    justifyContent: "center",
+  },
+  arrow: {
+    width: 44,
+    height: 44,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.white,
+    alignItems: "center",
     justifyContent: "center",
   },
   dotTarget: {
-    width: 44,
+    flex: 1,
+    maxWidth: 44,
     minHeight: 44,
     alignItems: "center",
     justifyContent: "center",

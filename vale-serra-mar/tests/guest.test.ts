@@ -104,6 +104,17 @@ it("visitante escolhe região e cidade, desliza ou toca nas bolinhas e entra sem
     .findAllByType(ScrollView)
     .find(({ props }) => props.horizontal)!;
   expect(carousel.props.snapToInterval).toBe(292);
+  const arrow = (label: string) => root.findAllByProps({ accessibilityLabel: label })[0];
+  const prev = arrow("Cidade anterior");
+  const next = arrow("Próxima cidade");
+  expect(prev.props.disabled).toBe(true);
+  expect(next.props.disabled).toBe(false);
+  await act(async () => next.props.onPress());
+  expect(root.findByType(Button).props.title).toBe("Explorar Santo Antônio do Pinhal");
+  await act(async () => prev.props.onPress());
+  expect(root.findByType(Button).props.title).toBe("Explorar Campos do Jordão");
+  await act(async () => root.findAllByProps({ accessibilityLabel: "Mostrar Monteiro Lobato" })[0].props.onPress());
+  expect(next.props.disabled).toBe(true);
   await act(async () =>
     carousel.props.onScroll({ nativeEvent: { contentOffset: { x: 292 } } }),
   );

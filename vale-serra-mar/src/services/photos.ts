@@ -2,6 +2,14 @@ import { Alert } from "../components/Dialogs";
 import { Platform } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
+
+const directory = `${FileSystem.documentDirectory}business-photos/`;
+
+export async function clearPickedPhotos() {
+  if (Platform.OS !== "web" && FileSystem.documentDirectory)
+    await FileSystem.deleteAsync(directory, { idempotent: true });
+}
+
 export async function pickPhoto(): Promise<string | null> {
   try {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -16,7 +24,6 @@ export async function pickPhoto(): Promise<string | null> {
       return null;
     }
     if (Platform.OS === "web") return asset.uri;
-    const directory = `${FileSystem.documentDirectory}business-photos/`;
     await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
     const extension = asset.uri.split(".").pop()?.split("?")[0] || "jpg";
     const destination = `${directory}${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;

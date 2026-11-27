@@ -26,6 +26,7 @@ import {
   HelpScreen,
 } from "./src/screens/Discover";
 import { ChooseCityScreen } from "./src/screens/ChooseCity";
+import { DeleteAccountScreen, SettingsScreen } from "./src/screens/Settings";
 import {
   BusinessScreen,
   GalleryScreen,
@@ -86,6 +87,8 @@ const screens: Record<ScreenName, React.ComponentType<ScreenProps>> = {
   BookingDetail: BookingDetailScreen,
   Reservations: ReservationsScreen,
   Profile: ProfileScreen,
+  Settings: SettingsScreen,
+  DeleteAccount: DeleteAccountScreen,
   Preferences: PreferencesScreen,
   Favorites: FavoritesScreen,
   Advertise: AdvertiseScreen,

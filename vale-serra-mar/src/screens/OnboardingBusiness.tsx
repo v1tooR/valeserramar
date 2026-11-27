@@ -89,9 +89,10 @@ export function AuthScreen({ route }: { route?: ScreenProps["route"] }) {
   const { authenticate, state, saveDraft } = useStore(),
     nav = useNav();
   const selection = route?.params?.advertiserPlanSelection;
-  const fromProfile = route?.params?.signupFromProfile === true;
+  const fromSettings = route?.params?.authFromSettings === true;
+  const fromProfile = route?.params?.signupFromProfile === true || fromSettings;
   const canCreate = !!selection || fromProfile;
-  const [create, setCreate] = useState(canCreate),
+  const [create, setCreate] = useState(canCreate && !fromSettings),
     [name, setName] = useState(""),
     [email, setEmail] = useState(""),
     [phone, setPhone] = useState(""),
@@ -124,6 +125,8 @@ export function AuthScreen({ route }: { route?: ScreenProps["route"] }) {
         selection,
         profile.phone,
       );
+    } else if (fromSettings) {
+      nav.popTo("Settings");
     } else if (fromProfile) {
       nav.popTo("Profile");
     } else {

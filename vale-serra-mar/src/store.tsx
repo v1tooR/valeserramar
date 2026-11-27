@@ -30,6 +30,7 @@ import {
 } from "./api/client";
 import { repository } from "./api/repository";
 import { preferencesSchema } from "./api/schemas";
+import { clearPickedPhotos } from "./services/photos";
 const STORAGE_KEY = "vale-serra-mar:preferences:v2";
 export const uid = () => Crypto.randomUUID();
 type Store = {
@@ -47,6 +48,7 @@ type Store = {
   ) => Promise<Profile>;
   logout: () => Promise<void>;
   updateProfile: (p: Profile) => Promise<void>;
+  deleteAccount: (password: string) => Promise<void>;
   saveDraft: (b: Business) => void;
   saveBusiness: (b: Business) => Promise<void>;
   setTableReservations: (
@@ -81,7 +83,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const writes = useRef(Promise.resolve());
   const revision = useRef(0);
   const refreshId = useRef(0);
-  const clearPrivate = () => {
+  const clearPrivate = (erasePreferences = false) => {
     revision.current++;
     current.current = {
       ...current.current,
@@ -102,6 +104,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       reservations: [],
       orders: [],
       cart: [],
+      ...(erasePreferences && { favorites: [], recent: [], interests: [], catalogFilters: null }),
     }));
   };
   async function refresh() {
@@ -159,7 +162,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }
   useEffect(() => {
     let alive = true;
-    setUnauthorizedHandler(clearPrivate);
+    setUnauthorizedHandler(() => clearPrivate());
     (async () => {
       try {
         await AsyncStorage.removeItem("vale-serra-mar:demo:v1");
@@ -423,6 +426,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           const profile = await repository.updateProfile(p);
           requireCurrent(version);
           setState((s) => ({ ...s, profile }));
+        },
+        deleteAccount: async (password) => {
+          const version = revision.current;
+          await repository.deleteAccount(password);
+          if (version !== revision.current) return;
+          const cleanup = Promise.allSettled([setAccessToken(""), clearPickedPhotos()]);
+          clearPrivate(true);
+          if ((await cleanup).some(({ status }) => status === "rejected")) {
+            setStorageError("A conta foi excluída. Alguns dados neste aparelho não puderam ser limpos.");
+          }
+          void refresh();
         },
         deleteProduct: async (p) => {
           const version = revision.current;

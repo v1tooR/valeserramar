@@ -108,6 +108,17 @@ export const repository = {
     data: { email: string; password: string; name?: string; phone?: string },
   ) => send(`/auth/${mode}`, "POST", data, authSchema),
   updateProfile: (data: Profile) => send("/me", "PATCH", data, profileSchema),
+  deleteAccount: async (password: string) => {
+    try {
+      await request<void>("/me", { method: "DELETE", body: JSON.stringify({ password }) });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 403)
+        throw new ApiError("Senha incorreta. Confira e tente novamente.", 403);
+      if (error instanceof ApiError && error.status === 429)
+        throw new ApiError("Muitas tentativas. Aguarde um minuto e tente novamente.", 429);
+      throw error;
+    }
+  },
   saveBusiness: async (b: Business, creating: boolean) =>
     send(
       creating ? "/businesses" : `/businesses/${encodeURIComponent(b.id)}`,

@@ -6,6 +6,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import rateLimit from "@fastify/rate-limit";
+import { deleteOwnAccount } from "./account-deletion.js";
 import { maxImageBytes, saveWebp } from "./media.js";
 import { adminRoutes } from "./admin/routes.js";
 import { row, transaction } from "./db.js";
@@ -141,6 +142,18 @@ export async function createApp({
       if (!profile) fail(401, "Sessão inválida ou expirada.");
       return profile;
     });
+  });
+  app.delete("/me", limit(5), async (req, reply) => {
+    const media = await deleteOwnAccount(db, req);
+    for (const { id } of media) {
+      try {
+        await unlink(join(mediaDir, id + ".webp"));
+      } catch (error) {
+        if (error.code !== "ENOENT")
+          req.log.warn({ code: error.code }, "Falha ao limpar mídia de conta excluída");
+      }
+    }
+    return reply.code(204).send();
   });
   app.post("/media", limit(30), async (req, reply) => {
     const { accountId } = await session(db, req);

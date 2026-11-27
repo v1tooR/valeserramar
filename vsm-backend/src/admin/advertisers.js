@@ -1,3 +1,4 @@
+import { deleteAccountData } from "../account-deletion.js";
 import { row, transaction } from "../db.js";
 import { fail } from "../security.js";
 import { highlightLock } from "./data.js";
@@ -50,16 +51,6 @@ export async function deleteAdvertiserPermanently(db, { id, version, confirmatio
     if (typeof confirmation !== "string" || confirmation.trim().toLowerCase() !== account.email.toLowerCase())
       fail(422, "Digite o e-mail desta conta para confirmar a exclusão.");
 
-    await client.query(`UPDATE vsm.businesses
-      SET owner_id=NULL, status='Desativado', deleted_at=COALESCE(deleted_at,now()),
-          home_highlight=NULL, explore_highlight=NULL
-      WHERE owner_id=$1`, [id]);
-
-    // Deixe cadastros em edição concluírem os uploads antes de bloquear novas referências à conta.
-    await client.query("SELECT id FROM vsm.accounts WHERE id=$1 FOR UPDATE", [id]);
-    await client.query("UPDATE vsm.media SET owner_id=NULL WHERE owner_id=$1", [id]);
-    await client.query("DELETE FROM vsm.requests WHERE scope LIKE $1", [id + ":%"]);
-    await client.query("DELETE FROM vsm.admin_advertiser_events WHERE account_id=$1", [id]);
-    await client.query("DELETE FROM vsm.accounts WHERE id=$1", [id]);
+    await deleteAccountData(client, id);
   });
 }

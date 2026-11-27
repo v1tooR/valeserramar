@@ -854,6 +854,12 @@ export function ProfileScreen() {
         icon="map-pin"
         onPress={() => nav.navigate("Preferences")}
       />
+      <Row
+        title="Configurações"
+        subtitle="Dados e gerenciamento da conta"
+        icon="settings"
+        onPress={() => nav.navigate("Settings")}
+      />
       {state.authenticated && (
         <Row
           title="Área do anunciante"

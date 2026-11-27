@@ -1,14 +1,16 @@
 import { beforeEach, expect, it, jest } from "@jest/globals";
 import React from "react";
-import { TextInput } from "react-native";
+import { Text, TextInput } from "react-native";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
-import { Button, Chip, Icon } from "../src/components/ui";
+import { ApiError } from "../src/api/client";
+import { Button, Chip, Icon, Row } from "../src/components/ui";
 import type { AdvertiserPlanSelection } from "../src/domain/advertiserPlans";
 import { initialState } from "../src/domain/catalog";
 import type { State } from "../src/domain/models";
 import type { ScreenProps } from "../src/navigation";
 import { ProfileScreen } from "../src/screens/Discover";
 import { AdvertiseScreen, AuthScreen } from "../src/screens/OnboardingBusiness";
+import { DeleteAccountScreen, SettingsScreen } from "../src/screens/Settings";
 import type { useStore } from "../src/store";
 
 const profile = {
@@ -26,16 +28,21 @@ const signupRoute: ScreenProps["route"] = {
   params: { advertiserPlanSelection: selection },
 };
 const mockAuthenticate = jest.fn<ReturnType<typeof useStore>["authenticate"]>();
+const mockUpdateProfile = jest.fn<ReturnType<typeof useStore>["updateProfile"]>();
+const mockDeleteAccount = jest.fn<ReturnType<typeof useStore>["deleteAccount"]>();
 const mockSaveDraft = jest.fn();
 const mockNavigate = jest.fn();
 const mockPopTo = jest.fn();
 const mockReplace = jest.fn();
 const mockReset = jest.fn();
+const mockGoBack = jest.fn();
 let mockState: State;
 jest.mock("../src/store", () => ({
   useStore: () => ({
     state: mockState,
     authenticate: mockAuthenticate,
+    updateProfile: mockUpdateProfile,
+    deleteAccount: mockDeleteAccount,
     saveDraft: mockSaveDraft,
   }),
   uid: () => "anuncio-teste",
@@ -46,6 +53,7 @@ jest.mock("../src/navigation", () => ({
     popTo: mockPopTo,
     replace: mockReplace,
     reset: mockReset,
+    goBack: mockGoBack,
     isFocused: () => true,
     getState: () => ({
       routes: [
@@ -83,6 +91,77 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockState = { ...initialState, region: "Vale do Paraíba", city: "Caçapava" };
   mockAuthenticate.mockResolvedValue(profile);
+  mockUpdateProfile.mockResolvedValue(undefined);
+  mockDeleteAccount.mockResolvedValue(undefined);
+});
+
+it("abre Configurações pelo Perfil e retorna à edição após entrar", async () => {
+  let tree!: ReactTestRenderer;
+  await act(async () => { tree = create(React.createElement(ProfileScreen)); });
+  const button = (title: string) => tree.root.findAllByType(Button).find(({ props }) => props.title === title)!;
+  const row = (title: string) => tree.root.findAllByType(Row).find(({ props }) => props.title === title)!;
+  try {
+    await act(async () => row("Configurações").props.onPress());
+    expect(mockNavigate).toHaveBeenCalledWith("Settings");
+    await act(async () => tree.update(React.createElement(SettingsScreen)));
+    await act(async () => button("Entrar").props.onPress());
+    const params = { authFromSettings: true };
+    expect(mockNavigate).toHaveBeenLastCalledWith("Auth", params);
+    await act(async () => tree.update(React.createElement(AuthScreen, {
+      route: { name: "Auth", key: "settings-signin", params },
+    })));
+    const [email, password] = tree.root.findAllByType(TextInput);
+    await act(async () => {
+      email.props.onChangeText(profile.email);
+      password.props.onChangeText("senha-de-teste");
+    });
+    await act(async () => button("Entrar").props.onPress());
+    expect(mockAuthenticate).toHaveBeenCalledWith("login", {
+      email: profile.email, password: "senha-de-teste",
+    });
+    expect(mockPopTo).toHaveBeenCalledWith("Settings");
+  } finally {
+    await act(async () => tree.unmount());
+  }
+});
+
+it("salva os dados atualizados e exige a senha atual para excluir a conta", async () => {
+  mockState = { ...mockState, authenticated: true, profile };
+  let tree!: ReactTestRenderer;
+  await act(async () => { tree = create(React.createElement(SettingsScreen)); });
+  const button = (title: string) => tree.root.findAllByType(Button).find(({ props }) => props.title === title)!;
+  const input = (label: string) => tree.root.findAllByType(TextInput).find(({ props }) => props.accessibilityLabel === label)!;
+  try {
+    expect(input("Nome completo").props.value).toBe(profile.name);
+    expect(button("Salvar alterações").props.disabled).toBe(true);
+    await act(async () => {
+      input("Nome completo").props.onChangeText("Maria da Serra");
+      input("E-mail").props.onChangeText("NOVO@EXAMPLE.COM");
+    });
+    await act(async () => button("Salvar alterações").props.onPress());
+    expect(mockUpdateProfile).toHaveBeenCalledWith({ ...profile, name: "Maria da Serra", email: "novo@example.com" });
+    const remove = tree.root.findAllByType(Row).find(({ props }) => props.title === "Excluir conta")!;
+    await act(async () => remove.props.onPress());
+    expect(mockNavigate).toHaveBeenCalledWith("DeleteAccount");
+    await act(async () => tree.update(React.createElement(DeleteAccountScreen)));
+    expect(button("Excluir definitivamente").props.disabled).toBe(true);
+    await act(async () => button("Cancelar").props.onPress());
+    expect(mockGoBack).toHaveBeenCalledTimes(1);
+    expect(mockDeleteAccount).not.toHaveBeenCalled();
+    mockDeleteAccount.mockRejectedValueOnce(new ApiError("Senha incorreta.", 403));
+    const password = input("Confirme sua senha");
+    expect(password.props.secureTextEntry).toBe(true);
+    await act(async () => password.props.onChangeText("senha-errada"));
+    await act(async () => button("Excluir definitivamente").props.onPress());
+    expect(tree.root.findAllByType(Text).some(({ props }) => props.children === "Senha incorreta.")).toBe(true);
+    expect(mockReset).not.toHaveBeenCalled();
+    await act(async () => password.props.onChangeText("senha-correta"));
+    await act(async () => button("Excluir definitivamente").props.onPress());
+    expect(mockDeleteAccount).toHaveBeenLastCalledWith("senha-correta");
+    expect(mockReset).toHaveBeenCalledWith({ index: 0, routes: [{ name: "Profile" }] });
+  } finally {
+    await act(async () => tree.unmount());
+  }
 });
 
 it("oferece a consulta de planos e a entrada para quem já é anunciante", async () => {

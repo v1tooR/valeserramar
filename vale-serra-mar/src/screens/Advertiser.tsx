@@ -451,6 +451,11 @@ export function AccountScreen() {
         icon="credit-card"
         onPress={() => nav.navigate("Subscription")}
       />
+      <Row
+        title="Configurações"
+        icon="settings"
+        onPress={() => nav.navigate("Settings")}
+      />
 
       <Row
         title="Ajuda para anunciantes"
