@@ -1,11 +1,13 @@
 import { expect, it, jest } from "@jest/globals";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React from "react";
+import { AppState, type AppStateStatus } from "react-native";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { StoreProvider, useStore } from "../src/store";
 import { catalogFiltersFor, emptyBusiness, initialState } from "../src/domain/catalog";
 import { setAccessToken } from "../src/api/client";
 import { repository } from "../src/api/repository";
+import { businessSchema } from "../src/api/schemas";
 import type { Reservation } from "../src/domain/models";
 jest.mock("@react-native-async-storage/async-storage", () =>
   require("@react-native-async-storage/async-storage/jest/async-storage-mock"),
@@ -15,8 +17,9 @@ jest.mock("expo-secure-store", () => ({
   setItemAsync: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
   deleteItemAsync: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 }));
+let mockApiConfigured = false;
 jest.mock("../src/api/client", () => ({
-  apiConfigured: false,
+  get apiConfigured() { return mockApiConfigured; },
   ensureGuest: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
   hasGuestSession: () => false,
   restoreTokens: jest.fn<() => Promise<boolean>>().mockResolvedValue(false),
@@ -25,7 +28,7 @@ jest.mock("../src/api/client", () => ({
   errorMessage: () => "Indisponível",
 }));
 jest.mock("../src/api/repository", () => ({
-  repository: { reserve: jest.fn(), auth: jest.fn(), deleteAccount: jest.fn() },
+  repository: { catalog: jest.fn(), reserve: jest.fn(), auth: jest.fn(), deleteAccount: jest.fn() },
 }));
 jest.mock("../src/services/photos", () => ({
   clearPickedPhotos: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
@@ -143,6 +146,53 @@ it("encerra a sessão e limpa os dados locais após confirmar a exclusão no ser
     expect(store.state).toMatchObject({ profile: null, authenticated: false, city: "Caçapava", favorites: [], recent: [], businesses: [visible] });
   } finally {
     await act(async () => tree.unmount());
+    await AsyncStorage.removeItem("vale-serra-mar:preferences:v2");
+  }
+});
+
+it("busca o catálogo ao abrir o app e atualiza os lugares ao voltar ao primeiro plano", async () => {
+  const first = businessSchema.parse({
+    ...emptyBusiness("public-first"),
+    name: "Casa A",
+    status: "Aprovado",
+  });
+  const second = { ...first, id: "public-second", name: "Casa B" };
+  const catalog = jest.mocked(repository.catalog);
+  const remove = jest.fn();
+  let onAppStateChange!: (next: AppStateStatus) => void;
+  const subscription = jest.spyOn(AppState, "addEventListener").mockImplementation(
+    (_event, listener) => {
+      onAppStateChange = listener;
+      return { remove };
+    },
+  );
+  mockApiConfigured = true;
+  catalog.mockReset()
+    .mockResolvedValueOnce({ businesses: [first], products: [] })
+    .mockResolvedValueOnce({ businesses: [first, second], products: [] });
+  let store!: ReturnType<typeof useStore>;
+  let tree: ReactTestRenderer | undefined;
+  function Probe() {
+    store = useStore();
+    return null;
+  }
+  try {
+    await act(async () => {
+      tree = create(React.createElement(StoreProvider, null, React.createElement(Probe)));
+    });
+    expect(catalog).toHaveBeenCalledTimes(1);
+    expect(store.state.businesses.map(({ id }) => id)).toEqual([first.id]);
+    await act(async () => {
+      onAppStateChange("background");
+      onAppStateChange("active");
+    });
+    expect(catalog).toHaveBeenCalledTimes(2);
+    expect(store.state.businesses.map(({ id }) => id)).toEqual([first.id, second.id]);
+  } finally {
+    await act(async () => tree?.unmount());
+    subscription.mockRestore();
+    expect(remove).toHaveBeenCalledTimes(1);
+    mockApiConfigured = false;
     await AsyncStorage.removeItem("vale-serra-mar:preferences:v2");
   }
 });

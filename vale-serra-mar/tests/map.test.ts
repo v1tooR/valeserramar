@@ -27,7 +27,9 @@ it("enquadra cada cidade sem pinos no próprio centro e respeita a região", () 
   expect(new Set(allCenters.map((center) => center.join(","))).size).toBe(
     allCenters.length,
   );
-  expect(mapData([]).viewport).toEqual(allCenters);
+  const viewport = mapData([]).viewport;
+  expect(viewport).toHaveLength(allCenters.length);
+  expect(viewport).toEqual(expect.arrayContaining(allCenters));
   expect(mapData([], { city: "santo antonio do pinhal" }).viewport).toEqual([
     [-22.8255, -45.662],
   ]);

@@ -383,24 +383,26 @@ export function BrandHeader({ showLocation = true }: { showLocation?: boolean })
         accessibilityRole="button"
         accessibilityLabel="Ir para o início"
         onPress={() => nav.reset({ index: 0, routes: [{ name: "Home" }] })}
-        style={u.brandLogo}
+        style={[u.brandLogo, showLocation && u.brandLogoCompact]}
       >
         <Image
           source={assets.logo}
-          style={{ width: 128, height: 43 }}
+          style={{ width: "100%", height: 43 }}
           resizeMode="contain"
         />
       </Pressable>
       {showLocation && (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Alterar região, ${state.city || "Região"}`}
+          accessibilityLabel={
+            state.city ? `Alterar cidade, ${state.city}` : "Escolher cidade"
+          }
           style={u.location}
-          onPress={() => nav.navigate("Preferences")}
+          onPress={() => nav.navigate("ChooseCity")}
         >
           <Icon name="map-pin" size={13} />
-          <Text numberOfLines={1} style={u.locationText}>
-            {state.city || "Região"}
+          <Text numberOfLines={1} ellipsizeMode="tail" style={u.locationText}>
+            {state.city || "Escolher cidade"}
           </Text>
           <Icon name="chevron-down" size={13} />
         </Pressable>
@@ -425,7 +427,6 @@ export function Tabs({
       ]
     : [
         ["Home", "Início", "home"],
-        ["Search", "Explorar", "search"],
         ["Map", "Mapa", "map"],
         ["Profile", "Perfil", "user"],
       ];
@@ -439,7 +440,9 @@ export function Tabs({
           key={screen}
           accessibilityRole="tab"
           accessibilityState={{ selected: active === screen }}
-          onPress={() => nav.dispatch(CommonActions.navigate({ name: screen }))}
+          onPress={() =>
+            nav.dispatch(CommonActions.navigate({ name: screen, pop: screen === "Home" }))
+          }
           style={u.tab}
         >
           <Icon
@@ -683,12 +686,17 @@ const u = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     flexDirection: "row",
-    flexWrap: "wrap",
+    flexWrap: "nowrap",
     alignItems: "center",
-    columnGap: 8,
-    rowGap: 2,
+    gap: 8,
   },
-  brandLogo: { minHeight: 44, justifyContent: "center" },
+  brandLogo: {
+    width: 128,
+    maxWidth: 128,
+    minHeight: 44,
+    justifyContent: "center",
+  },
+  brandLogoCompact: { width: "40%" },
   location: {
     flexDirection: "row",
     gap: 4,
@@ -697,7 +705,8 @@ const u = StyleSheet.create({
     minHeight: 30,
     paddingHorizontal: 9,
     paddingVertical: 5,
-    maxWidth: "100%",
+    flexShrink: 1,
+    minWidth: 0,
     alignItems: "center",
   },
   locationText: {
@@ -705,6 +714,7 @@ const u = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     flexShrink: 1,
+    minWidth: 0,
   },
   header: {
     flexShrink: 0,

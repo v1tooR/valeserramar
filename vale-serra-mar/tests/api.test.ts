@@ -58,3 +58,14 @@ it("resposta 204 é aceita sem tentar ler JSON", async () => {
     request("/products/1", { method: "DELETE" }),
   ).resolves.toBeUndefined();
 });
+
+it("solicita um catálogo atualizado ao recarregar os estabelecimentos", async () => {
+  const { repository } = require("../src/api/repository") as typeof import("../src/api/repository");
+  const catalog = { businesses: [], products: [] };
+  fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => catalog } as Response);
+  await expect(repository.catalog()).resolves.toEqual(catalog);
+  expect(fetchMock).toHaveBeenCalledWith(
+    "https://api.invalid/catalog",
+    expect.objectContaining({ cache: "no-store" }),
+  );
+});

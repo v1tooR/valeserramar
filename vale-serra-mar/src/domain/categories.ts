@@ -4,7 +4,6 @@ export const advertisingAgency = "Agência de Publicidade";
 export type ServiceType = typeof advertisingAgency;
 
 export const exploreCategories = [
-  advertisingAgency,
   "Alimentação",
   "Comércio",
   "Estética e Beleza",
@@ -71,13 +70,17 @@ export const lodgingTypes: readonly BusinessType[] =
     lodgingType,
   }));
 
-export const businessTypes: readonly BusinessType[] = [
+export const serviceTypes: readonly BusinessType[] = [
   {
     label: advertisingAgency,
     segment: "Serviços",
-    category: advertisingAgency,
+    category: "Serviços",
     serviceType: advertisingAgency,
   },
+];
+
+export const businessTypes: readonly BusinessType[] = [
+  ...serviceTypes,
   ...foodTypes,
   { label: "Comércio", segment: "Comércio", category: "Comércio" },
   subcategoryType("Estética e Beleza", "Estética e Beleza"),

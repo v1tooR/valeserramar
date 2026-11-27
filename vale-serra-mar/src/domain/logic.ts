@@ -7,7 +7,7 @@ import type {
   Product,
 } from "./models";
 import { businessType, exploreCategories } from "./categories";
-import { cityKey, regionForCity } from "./catalog";
+import { cityKey, compareNames, regionForCity } from "./catalog";
 export const money = (value: number) =>
   value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 export const normalize = (text: string) =>
@@ -147,7 +147,7 @@ export function filterBusinesses(
   const selectedCategory = exploreCategories.find(
     (category) => category === filters.segment,
   );
-  return businesses.filter((b) => {
+  const matches = businesses.filter((b) => {
     if (
       b.status !== "Aprovado" ||
       (city && cityKey(b.city) !== city) ||
@@ -173,6 +173,7 @@ export function filterBusinesses(
     }
     return !filters.openNow || isOpen(b, now);
   });
+  return matches.sort((a, b) => compareNames(a.name, b.name));
 }
 export function validateReservation(
   r: Omit<Reservation, "id" | "createdAt" | "status" | "reply">,

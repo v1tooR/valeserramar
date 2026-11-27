@@ -8,7 +8,7 @@ import {
   type AdvertiserHighlightId,
   type AdvertiserPlanSelection,
 } from "../domain/advertiserPlans";
-import { emptyBusiness, regions } from "../domain/catalog";
+import { emptyBusiness } from "../domain/catalog";
 import { money } from "../domain/logic";
 import { useNav, type ScreenProps } from "../navigation";
 import { uid, useStore } from "../store";
@@ -123,11 +123,12 @@ export function startBusinessRegistration(
   selection: AdvertiserPlanSelection,
   phone = state.profile?.phone || "",
 ) {
+  const draft = emptyBusiness(`draft-${uid()}`);
   const business = {
-    ...emptyBusiness(`draft-${uid()}`),
+    ...draft,
     phone,
-    region: state.region || regions[0].name,
-    city: state.city || "Caçapava",
+    region: state.region || draft.region,
+    city: state.city || draft.city,
     draftPlan: selection,
   };
   saveDraft(business);

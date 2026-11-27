@@ -8,10 +8,8 @@ import type {
   NativeStackScreenProps,
 } from "@react-navigation/native-stack";
 export type ScreenName =
-  | "Welcome"
   | "ChooseCity"
   | "Home"
-  | "Search"
   | "Results"
   | "Filters"
   | "Map"
@@ -27,7 +25,6 @@ export type ScreenName =
   | "Profile"
   | "Settings"
   | "DeleteAccount"
-  | "Preferences"
   | "Favorites"
   | "Advertise"
   | "Auth"
@@ -54,6 +51,7 @@ export type Params =
   | {
       businessId?: string;
       productId?: string;
+      photoIndex?: number;
       reservationId?: string;
       roomId?: string;
       step?: number;
@@ -63,8 +61,6 @@ export type Params =
       advertiserPlanSelection?: AdvertiserPlanSelection;
       signupFromProfile?: boolean;
       authFromSettings?: boolean;
-      locationRegion?: string;
-      changeLocation?: boolean;
     }
   | undefined;
 export type Routes = { [K in ScreenName]: Params };

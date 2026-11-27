@@ -1,39 +1,19 @@
-import React, { useMemo } from "react";
-import {
-  Image,
-  ImageBackground,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import React, { useMemo, useState } from "react";
+import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
 import { assets } from "../assets";
 import { Tap } from "../components/Motion";
-import { Button, Icon, Page } from "../components/ui";
-import { usePagedCarousel } from "../components/usePagedCarousel";
-import { cityKey, regions, visitCity } from "../domain/catalog";
-import { useNav, type ScreenProps } from "../navigation";
+import { Icon, Page } from "../components/ui";
+import { cityKey, regionForCity, regions, visitCity } from "../domain/catalog";
+import { useNav } from "../navigation";
 import { useStore } from "../store";
 import { colors as c, styles as s } from "../theme";
 
-export function ChooseCityScreen({ route }: ScreenProps) {
+export function ChooseCityScreen() {
   const nav = useNav();
   const { state, update, loadError } = useStore();
-  const regionName = route.params?.locationRegion ?? state.region;
-  const region = regions.find(({ name }) => name === regionName) ?? regions[0];
-  const changing = route.params?.changeLocation === true;
-  const { cities } = region;
-  const { current, width, goTo, onLayout, scrollProps } = usePagedCarousel(
-    cities.length,
-    region.name,
-    {
-      initialIndex: cities.findIndex(
-        (name) => cityKey(name) === cityKey(state.city),
-      ),
-      sideInset: 24,
-    },
-  );
-  const city = cities[current];
+  const [expandedRegion, setExpandedRegion] = useState<string | null>(null);
+  const savedRegion = regionForCity(state.city) ?? state.region;
+  const savedCityKey = cityKey(state.city);
   const listings = useMemo(() => {
     const totals = new Map<string, number>();
     for (const business of state.businesses) {
@@ -45,24 +25,14 @@ export function ChooseCityScreen({ route }: ScreenProps) {
   }, [state.businesses]);
   const showListings = listings.size > 0 && !loadError;
 
-  function confirmLocation() {
+  function selectCity(city: string) {
     update((saved) => visitCity(saved, city));
-    if (changing) nav.goBack();
+    if (nav.canGoBack()) nav.goBack();
     else nav.reset({ index: 0, routes: [{ name: "Home" }] });
   }
 
   return (
-    <Page
-      title="Localização"
-      scroll={false}
-      footer={
-        <Button
-          title={changing ? "Confirmar cidade" : `Explorar ${city}`}
-          icon={changing ? "check" : "arrow-right"}
-          onPress={confirmLocation}
-        />
-      }
-    >
+    <Page title="Localização" back={nav.canGoBack()} scroll={false}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
@@ -71,140 +41,127 @@ export function ChooseCityScreen({ route }: ScreenProps) {
       >
         <View style={styles.intro}>
           <Image
-            source={assets.logo}
+            source={assets.logoFull}
             style={styles.logo}
             resizeMode="contain"
-            accessible={false}
+            accessible
+            accessibilityLabel="Vale, Serra e Mar"
           />
-          <View style={styles.steps}>
-            <View style={styles.step}>
-              <Icon name="check" size={14} />
-              <Text style={styles.stepLabel}>Região</Text>
-            </View>
-            <Icon name="chevron-right" size={14} color={c.muted} />
-            <View style={[styles.step, styles.stepCurrent]}>
-              <Icon name="map-pin" size={14} />
-              <Text style={[styles.stepLabel, styles.stepCurrentLabel]}>
-                Cidade
-              </Text>
-            </View>
-          </View>
           <Text accessibilityRole="header" style={styles.title}>
             Escolha sua cidade
           </Text>
+          <Text style={styles.hint}>
+            Abra uma região e toque na cidade que quer explorar.
+          </Text>
         </View>
 
-        <View style={styles.panel}>
-          <ImageBackground
-            source={region.photo}
-            style={styles.cover}
-            resizeMode="cover"
-            resizeMethod="resize"
-            imageStyle={styles.coverImage}
-          >
-            <View style={styles.shade} />
-            <View style={styles.region}>
-              <Icon name="map" size={15} color={c.white} />
-              <Text style={styles.regionLabel}>{region.name}</Text>
-            </View>
-          </ImageBackground>
-          <View
-            testID="city-carousel"
-            onLayout={onLayout}
-            style={styles.viewport}
-          >
-            {width > 0 && (
-              <ScrollView {...scrollProps} keyboardShouldPersistTaps="handled">
-                {cities.map((name, index) => {
-                  const selected = index === current;
-                  const total = listings.get(cityKey(name)) ?? 0;
-                  return (
-                    <View
-                      key={name}
-                      style={[styles.slide, { width }]}
-                      accessibilityElementsHidden={!selected}
-                      importantForAccessibility={
-                        selected ? "auto" : "no-hide-descendants"
-                      }
-                      aria-hidden={!selected}
-                    >
-                      <Tap
-                        accessibilityRole="radio"
-                        accessibilityLabel={name}
-                        accessibilityState={{ checked: selected, selected }}
-                        focusable={selected}
-                        onPress={() => goTo(index)}
-                        style={[
-                          styles.cityCard,
-                          selected && styles.cityCardSelected,
-                        ]}
-                      >
-                        <View style={styles.cityIcon}>
-                          <Icon name="map-pin" size={21} />
-                        </View>
-                        <View style={styles.cityInfo}>
-                          <Text style={styles.cityName}>{name}</Text>
-                          {showListings && (
-                            <Text style={styles.cityDetail}>
-                              {total === 0
-                                ? "Sem estabelecimentos listados"
-                                : total === 1
-                                  ? "1 lugar no guia"
-                                  : `${total} lugares no guia`}
-                            </Text>
-                          )}
-                        </View>
-                        <Icon
-                          name={selected ? "check-circle" : "circle"}
-                          size={20}
-                        />
-                      </Tap>
-                    </View>
-                  );
-                })}
-              </ScrollView>
-            )}
-          </View>
-          <View style={styles.pagination}>
-            <Tap
-              accessibilityRole="button"
-              accessibilityLabel="Cidade anterior"
-              disabled={!width || current === 0}
-              onPress={() => goTo(current - 1)}
-              style={styles.arrow}
-            >
-              <Icon name="chevron-left" size={22} />
-            </Tap>
-            <View style={styles.dots}>
-              {cities.map((name, index) => (
+        <View style={styles.regions}>
+          <Text accessibilityRole="header" style={s.eyebrow}>
+            Regiões
+          </Text>
+          {regions.map(({ name, cities, photo }) => {
+            const expanded = expandedRegion === name;
+            const currentCity = savedRegion === name ? state.city : "";
+            return (
+              <View
+                key={name}
+                style={[styles.region, expanded && styles.regionOpen]}
+              >
                 <Tap
-                  key={name}
                   accessibilityRole="button"
-                  accessibilityLabel={`Mostrar ${name}`}
-                  accessibilityState={{ selected: current === index }}
-                  onPress={() => goTo(index)}
-                  style={styles.dotTarget}
+                  accessibilityLabel={name}
+                  accessibilityHint={
+                    currentCity ? `${currentCity}, cidade atual` : undefined
+                  }
+                  aria-expanded={expanded}
+                  onPress={() =>
+                    setExpandedRegion((current) =>
+                      current === name ? null : name,
+                    )
+                  }
+                  style={[
+                    styles.regionButton,
+                    expanded && styles.regionButtonOpen,
+                  ]}
                 >
-                  <View
-                    style={[styles.dot, current === index && styles.dotActive]}
+                  <Image
+                    source={photo}
+                    style={styles.regionPhoto}
+                    resizeMode="cover"
+                    resizeMethod="resize"
+                    accessible={false}
                   />
+                  <View style={styles.regionText}>
+                    <Text style={styles.regionName}>{name}</Text>
+                    {currentCity ? (
+                      <View style={styles.current}>
+                        <Icon name="map-pin" size={12} />
+                        <Text style={styles.currentText}>{currentCity}</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.detail}>{cities.length} cidades</Text>
+                    )}
+                  </View>
+                  <View
+                    style={[
+                      styles.regionArrow,
+                      expanded && styles.regionArrowOpen,
+                    ]}
+                  >
+                    <Icon
+                      name={expanded ? "chevron-up" : "chevron-down"}
+                      size={20}
+                    />
+                  </View>
                 </Tap>
-              ))}
-            </View>
-            <Tap
-              accessibilityRole="button"
-              accessibilityLabel="Próxima cidade"
-              disabled={!width || current === cities.length - 1}
-              onPress={() => goTo(current + 1)}
-              style={styles.arrow}
-            >
-              <Icon name="chevron-right" size={22} />
-            </Tap>
-          </View>
+                {expanded && (
+                  <View style={styles.cities}>
+                    {cities.map((city) => {
+                      const key = cityKey(city);
+                      const current = key === savedCityKey;
+                      const total = listings.get(key) ?? 0;
+                      return (
+                        <Tap
+                          key={city}
+                          accessibilityRole="button"
+                          accessibilityLabel={
+                            current ? `${city}, cidade atual` : city
+                          }
+                          accessibilityState={{ selected: current }}
+                          onPress={() => selectCity(city)}
+                          style={[
+                            styles.cityButton,
+                            current && styles.cityCurrent,
+                          ]}
+                        >
+                          <View style={styles.cityIcon}>
+                            <Icon name="map-pin" size={17} />
+                          </View>
+                          <View style={styles.cityText}>
+                            <Text style={styles.cityName}>{city}</Text>
+                            {showListings && (
+                              <Text style={styles.detail}>
+                                {total === 0
+                                  ? "Sem lugares no guia"
+                                  : total === 1
+                                    ? "1 lugar no guia"
+                                    : `${total} lugares no guia`}
+                              </Text>
+                            )}
+                          </View>
+                          <Icon
+                            name={current ? "check" : "chevron-right"}
+                            size={17}
+                          />
+                        </Tap>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            );
+          })}
         </View>
-        <Text style={styles.hint}>
-          Deslize ou use as setas para trocar de cidade.
-        </Text>
       </ScrollView>
     </Page>
   );
@@ -213,120 +170,75 @@ export function ChooseCityScreen({ route }: ScreenProps) {
 const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: {
-    flexGrow: 1,
-    justifyContent: "center",
     paddingHorizontal: 18,
-    paddingVertical: 18,
-    gap: 14,
+    paddingTop: 8,
+    paddingBottom: 24,
+    gap: 20,
     width: "100%",
     maxWidth: 520,
     alignSelf: "center",
   },
-  intro: { alignItems: "center", gap: 10, marginBottom: 4 },
-  logo: { width: 168, height: 56, marginBottom: 2 },
-  steps: { ...s.row, gap: 7 },
-  step: {
-    ...s.row,
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-    backgroundColor: c.soft,
-  },
-  stepCurrent: { backgroundColor: c.mint },
-  stepLabel: { color: "#50665C", fontSize: 12, fontWeight: "600" },
-  stepCurrentLabel: { color: c.green, fontWeight: "700" },
-  title: { ...s.title, fontSize: 29, lineHeight: 34, textAlign: "center" },
-  panel: {
-    backgroundColor: c.soft,
-    borderRadius: 25,
+  intro: { alignItems: "center", gap: 4 },
+  logo: { width: 174, height: 174, marginTop: -18, marginBottom: -20 },
+  title: { ...s.title, fontSize: 28, lineHeight: 34, textAlign: "center" },
+  hint: { ...s.muted, textAlign: "center", maxWidth: 300 },
+  regions: { gap: 10 },
+  region: {
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: c.border,
-    paddingBottom: 3,
+    backgroundColor: c.white,
     overflow: "hidden",
   },
-  cover: {
-    aspectRatio: 1.95,
-    maxHeight: 220,
-    justifyContent: "flex-end",
-    alignItems: "flex-start",
-    backgroundColor: c.dark,
-    padding: 13,
-  },
-  coverImage: { backgroundColor: c.mint },
-  shade: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(11, 42, 32, 0.12)",
-  },
-  region: {
-    ...s.row,
-    gap: 7,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-    borderRadius: 10,
-    backgroundColor: "rgba(20, 61, 49, 0.94)",
-  },
-  regionLabel: {
-    color: c.white,
-    fontSize: 13,
+  regionOpen: { borderColor: "#A6CBB9", backgroundColor: c.soft },
+  regionButton: { ...s.row, minHeight: 76, padding: 10, gap: 12 },
+  regionButtonOpen: { backgroundColor: c.mint },
+  regionPhoto: { width: 54, height: 54, borderRadius: 12, flexShrink: 0 },
+  regionText: { flex: 1, minWidth: 0, gap: 2 },
+  regionName: {
+    color: c.dark,
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: "700",
+  },
+  current: { ...s.row, gap: 4 },
+  currentText: {
+    color: c.green,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "600",
     flexShrink: 1,
   },
-  viewport: { minHeight: 86 },
-  slide: { paddingHorizontal: 5, paddingTop: 12, paddingBottom: 2 },
-  cityCard: {
+  detail: { color: "#536A5F", fontSize: 12, lineHeight: 17 },
+  regionArrow: {
+    width: 33,
+    height: 33,
+    flexShrink: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 11,
+    backgroundColor: c.soft,
+  },
+  regionArrowOpen: { backgroundColor: c.white },
+  cities: { padding: 8, gap: 5 },
+  cityButton: {
     ...s.row,
-    flexGrow: 1,
-    minHeight: 78,
-    paddingHorizontal: 11,
-    paddingVertical: 11,
-    borderWidth: 1.5,
-    borderColor: c.border,
-    borderRadius: 17,
+    minHeight: 48,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+    borderRadius: 11,
     backgroundColor: c.white,
   },
-  cityCardSelected: { borderColor: c.green, backgroundColor: "#FAFDFA" },
+  cityCurrent: { backgroundColor: "#D8EFE2" },
   cityIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 13,
+    width: 30,
+    height: 30,
+    flexShrink: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 9,
     backgroundColor: c.mint,
-    justifyContent: "center",
-    alignItems: "center",
   },
-  cityInfo: { flex: 1, minWidth: 0, gap: 4 },
-  cityName: { fontSize: 19, lineHeight: 23, fontWeight: "700", color: c.dark },
-  cityDetail: { fontSize: 12, lineHeight: 16, color: "#50665C" },
-  pagination: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  dots: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: "row",
-    justifyContent: "center",
-  },
-  arrow: {
-    width: 44,
-    height: 44,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: c.border,
-    backgroundColor: c.white,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dotTarget: {
-    flex: 1,
-    maxWidth: 44,
-    minHeight: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dot: { width: 7, height: 7, borderRadius: 5, backgroundColor: "#93A89C" },
-  dotActive: { width: 18, height: 8, backgroundColor: c.green },
-  hint: { ...s.muted, color: "#50665C", textAlign: "center" },
+  cityText: { flex: 1, minWidth: 0 },
+  cityName: { color: c.dark, fontSize: 14, lineHeight: 19, fontWeight: "600" },
 });

@@ -99,7 +99,8 @@ async function businessBody(b: Business) {
 }
 export const repository = {
   logout: () => request<void>("/auth/logout", { method: "POST" }),
-  catalog: () => get("/catalog", catalogSchema),
+  catalog: async () =>
+    parse(catalogSchema, await request("/catalog", { cache: "no-store" })),
   profile: () => get("/me", profileSchema),
   workspace: () => get("/me/workspace", workspaceSchema),
   reservations: () => get("/reservations", z.array(reservationSchema)),

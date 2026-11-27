@@ -4,9 +4,9 @@ A implementação usa telas compartilhadas quando o desenho representa estados d
 
 | Referência | Tela/estado no código |
 | --- | --- |
-| VIS-01 Boas-vindas | Welcome, região e entrada sem conta |
+| VIS-01 Boas-vindas | ChooseCity, regiões e cidades na mesma tela e entrada sem conta |
 | VIS-02 Home | Home |
-| VIS-03 Busca | Search |
+| VIS-03 Busca | Busca ao vivo na Home |
 | VIS-04 Resultados-Lista | Results |
 | VIS-05 Filtros | Filters / FilterForm |
 | VIS-06 Resultados-Mapa | Map |
@@ -46,7 +46,7 @@ A implementação usa telas compartilhadas quando o desenho representa estados d
 | ANU-17 Indicadores | Indicators |
 | ANU-18 Conta-Alternar-Modo | Account |
 
-Complementos: Preferences (região/interesses), Favorites, Gallery, Help e Subscription. Nenhuma tela de administração web foi criada.
+Complementos: Favorites, Gallery (visualizador de fotos), Help e Subscription. Nenhuma tela de administração web foi criada.
 
 ## Comportamento da versão 0.2.0
 

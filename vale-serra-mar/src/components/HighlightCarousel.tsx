@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-  Image,
   ImageBackground,
   Platform,
   Pressable,
@@ -10,59 +9,18 @@ import {
   View,
   type ImageSourcePropType,
 } from "react-native";
-import { photoSource } from "../assets";
-import { cityKey } from "../domain/catalog";
+import { cityKey, compareNames } from "../domain/catalog";
 import type { Business } from "../domain/models";
 import { useNav } from "../navigation";
 import { colors as c, styles as s } from "../theme";
+import { BannerImage, bannerAspectRatio } from "./BusinessPhotos";
 import { Tap } from "./Motion";
 import { Chip, Icon, Section } from "./ui";
 import { usePagedCarousel } from "./usePagedCarousel";
 
 const autoAdvanceMs = 5000;
-const bannerAspectRatio = 16 / 9;
 const dotTargetWidth = 24;
 const announcementArtwork: ImageSourcePropType = require("../../assets/inicio-anuncie.jpg");
-
-function BannerImage({ photo }: { photo: Business["photo"] }) {
-  const source = photoSource(photo);
-  const [fillBackground, setFillBackground] = useState(false);
-
-  return (
-    <View style={styles.letterbox}>
-      {fillBackground && (
-        <View
-          pointerEvents="none"
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-          style={StyleSheet.absoluteFill}
-        >
-          <Image
-            source={source}
-            style={styles.backdrop}
-            resizeMode="cover"
-            resizeMethod="resize"
-            blurRadius={22}
-          />
-          <View style={styles.shade} />
-        </View>
-      )}
-      <Image
-        source={source}
-        style={styles.image}
-        resizeMode="contain"
-        onLoad={({ nativeEvent }) => {
-          const { width, height } = nativeEvent.source ?? {};
-          setFillBackground(
-            !width ||
-              !height ||
-              width !== Math.round(height * bannerAspectRatio),
-          );
-        }}
-      />
-    </View>
-  );
-}
 
 export function HighlightCarousel({
   businesses,
@@ -80,7 +38,7 @@ export function HighlightCarousel({
     if (group) group.banners.push(business);
     else groups.set(key, { label: business.city, banners: [business] });
   }
-  const cities = [...groups].sort(([, a], [, b]) => a.label.localeCompare(b.label, "pt-BR"));
+  const cities = [...groups].sort(([, a], [, b]) => compareNames(a.label, b.label));
   const city = groups.has(selectedCity) ? selectedCity : cities[0]?.[0] ?? "";
   const banners = groups.get(city)?.banners ?? [];
   const slides = banners.map((business) => business.id).join(",");
@@ -248,16 +206,6 @@ const styles = StyleSheet.create({
     aspectRatio: bannerAspectRatio,
     overflow: "hidden",
     backgroundColor: "#172F28",
-  },
-  image: { width: "100%", height: "100%" },
-  backdrop: {
-    width: "100%",
-    height: "100%",
-    transform: [{ scale: 1.12 }],
-  },
-  shade: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(15, 39, 31, 0.24)",
   },
   adArtwork: {
     justifyContent: "center",

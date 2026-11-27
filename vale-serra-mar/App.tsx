@@ -16,12 +16,9 @@ import {
   Page,
 } from "./src/components/ui";
 import {
-  WelcomeScreen,
   HomeScreen,
-  SearchScreen,
   ResultsScreen,
   ProfileScreen,
-  PreferencesScreen,
   FavoritesScreen,
   HelpScreen,
 } from "./src/screens/Discover";
@@ -70,10 +67,8 @@ import {
 } from "./src/screens/Advertiser";
 const Stack = createNativeStackNavigator<Routes>();
 const screens: Record<ScreenName, React.ComponentType<ScreenProps>> = {
-  Welcome: WelcomeScreen,
   ChooseCity: ChooseCityScreen,
   Home: HomeScreen,
-  Search: SearchScreen,
   Results: ResultsScreen,
   Filters: ResultsScreen,
   Map: MapScreen,
@@ -89,7 +84,6 @@ const screens: Record<ScreenName, React.ComponentType<ScreenProps>> = {
   Profile: ProfileScreen,
   Settings: SettingsScreen,
   DeleteAccount: DeleteAccountScreen,
-  Preferences: PreferencesScreen,
   Favorites: FavoritesScreen,
   Advertise: AdvertiseScreen,
   Auth: AuthScreen,
@@ -221,7 +215,7 @@ function Navigator() {
       }}
     >
       <Stack.Navigator
-        initialRouteName={state.region && state.city ? "Home" : "Welcome"}
+        initialRouteName={state.region && state.city ? "Home" : "ChooseCity"}
         screenOptions={{
           headerShown: false,
           animation: reducedMotion ? "none" : "slide_from_right",

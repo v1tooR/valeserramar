@@ -172,11 +172,11 @@ it("usa a cidade real mesmo quando um cadastro antigo tem a região incorreta", 
   };
   const records = [...businesses, coast];
   expect(filterBusinesses(records, filters, "", "Vale do Paraíba")).toEqual(
-    businesses,
+    [businesses[1], businesses[0]],
   );
   expect(
     filterBusinesses(records, { ...filters, city: "Caçapava" }, "", ""),
-  ).toEqual(businesses);
+  ).toEqual([businesses[1], businesses[0]]);
   expect(
     filterBusinesses(
       records,
@@ -250,7 +250,7 @@ it("filtra categorias e separa subcategorias com o mesmo segmento", () => {
   const ids = (segment: string) =>
     filterBusinesses(places, { ...filters, segment }, "", "").map((b) => b.id);
 
-  expect(ids("Alimentação")).toEqual(["quintal", "cafe", "doceria", "lanches"]);
+  expect(ids("Alimentação")).toEqual(["cafe", "doceria", "quintal", "lanches"]);
   expect(ids("Restaurante")).toEqual(["quintal"]);
   expect(ids("Cafeteria")).toEqual(["cafe"]);
   expect(ids("Doceria")).toEqual(["doceria"]);
@@ -265,13 +265,13 @@ it("filtra categorias e separa subcategorias com o mesmo segmento", () => {
   expect(ids("Pousadas")).toEqual(["pousada"]);
   expect(ids("Airbnb")).toEqual(["airbnb"]);
   expect(ids("Lazer")).toEqual(["lazer"]);
-  expect(ids("Serviços")).toEqual(["servico"]);
+  expect(ids("Serviços")).toEqual(["servico", "agencia"]);
   expect(ids("Estética e Beleza")).toEqual(["salao"]);
   expect(ids(advertisingAgency)).toEqual(["agencia"]);
   expect(filterBusinesses(places, filters, "agencia de publicidade", "").map(b => b.id))
     .toEqual(["agencia"]);
   expect(businessTypes.find(type => type.label === advertisingAgency)).toMatchObject({
-    segment: "Serviços", category: advertisingAgency, serviceType: advertisingAgency,
+    segment: "Serviços", category: "Serviços", serviceType: advertisingAgency,
   });
 });
 it("considera expediente atravessando meia-noite no fuso de São Paulo", () => {

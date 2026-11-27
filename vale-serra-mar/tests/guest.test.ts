@@ -1,13 +1,12 @@
 import { it, expect, jest } from "@jest/globals";
 import React from "react";
-import { ScrollView, View } from "react-native";
 import { create, act, type ReactTestRenderer } from "react-test-renderer";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { StyleSheet, Text } from "react-native";
 import { StoreProvider } from "../src/store";
-import { WelcomeScreen } from "../src/screens/Discover";
 import { ChooseCityScreen } from "../src/screens/ChooseCity";
-import { Button } from "../src/components/ui";
-import type { ScreenProps } from "../src/navigation";
+import { Tap } from "../src/components/Motion";
+import { BrandHeader } from "../src/components/ui";
 jest.mock("expo-secure-store", () => ({
   getItemAsync: jest.fn<() => Promise<null>>().mockResolvedValue(null),
   setItemAsync: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
@@ -18,7 +17,6 @@ jest.mock("expo-haptics", () => ({
 }));
 const mockReset = jest.fn();
 const mockNavigate = jest.fn();
-const mockScrollTo = jest.fn();
 jest.mock("@react-navigation/native", () => ({ useIsFocused: () => true }));
 jest.mock("../src/navigation", () => ({
   useNav: () => ({
@@ -27,17 +25,6 @@ jest.mock("../src/navigation", () => ({
     navigate: mockNavigate,
   }),
 }));
-jest.mock("react-native/Libraries/Components/ScrollView/ScrollView", () => {
-  const React = require("react") as typeof import("react");
-  const Viewport = React.forwardRef(function Viewport(
-    props: React.PropsWithChildren,
-    ref,
-  ) {
-    React.useImperativeHandle(ref, () => ({ scrollTo: mockScrollTo }));
-    return props.children;
-  });
-  return { __esModule: true, default: Viewport };
-});
 jest.mock("@react-native-async-storage/async-storage", () =>
   require("@react-native-async-storage/async-storage/jest/async-storage-mock"),
 );
@@ -46,7 +33,7 @@ jest.mock(
   () => require("react-native-safe-area-context/jest/mock").default,
 );
 jest.mock("@expo/vector-icons", () => ({ Feather: "Feather" }));
-it("visitante escolhe região e cidade, desliza ou toca nas bolinhas e entra sem conta", async () => {
+it("visitante escolhe uma cidade na mesma tela e entra sem conta", async () => {
   await AsyncStorage.clear();
   mockReset.mockClear();
   mockNavigate.mockClear();
@@ -56,87 +43,66 @@ it("visitante escolhe região e cidade, desliza ou toca nas bolinhas e entra sem
       React.createElement(
         StoreProvider,
         null,
-        React.createElement(WelcomeScreen),
+        React.createElement(ChooseCityScreen),
       ),
     );
   });
-  const radios = view.root.findAll(
-    (node) =>
-      node.props.accessibilityRole === "radio" &&
-      node.parent?.props.accessibilityRole !== "radio",
-  );
-  expect(radios).toHaveLength(3);
-  await act(async () => {
-    radios[1].props.onPress();
-  });
-  const start = view.root
-    .findAllByType(Button)
-    .find((node) => node.props.title === "Escolher cidade")!;
-  await act(async () => {
-    start.props.onPress();
-  });
-  const params = { locationRegion: "Serra da Mantiqueira" };
-  expect(mockNavigate).toHaveBeenCalledWith("ChooseCity", params);
-  expect(mockReset).not.toHaveBeenCalled();
+  const entry = (label: string) =>
+    view.root
+      .findAllByType(Tap)
+      .find(({ props }) => props.accessibilityLabel === label);
+  const region = (label: string) => entry(label)!;
+  const valley = region("Vale do Paraíba");
+  const mountain = region("Serra da Mantiqueira");
+  const coast = region("Litoral Norte");
+  const buttons = view.root
+    .findAllByType(Tap)
+    .filter(({ props }) => props["aria-expanded"] !== undefined);
+  expect(buttons.map(({ props }) => props.accessibilityLabel)).toEqual([
+    "Litoral Norte",
+    "Serra da Mantiqueira",
+    "Vale do Paraíba",
+  ]);
   const readPreferences = async () =>
     JSON.parse((await AsyncStorage.getItem("vale-serra-mar:preferences:v2"))!);
-  expect(await readPreferences()).toMatchObject({ region: "", city: "" });
 
-  await act(async () => {
-    view.update(
-      React.createElement(
-        StoreProvider,
-        null,
-        React.createElement(ChooseCityScreen, {
-          route: { name: "ChooseCity", params },
-        } as ScreenProps),
-      ),
-    );
-  });
-  const root = view.root;
-  const viewport = root
-    .findAllByType(View)
-    .find(({ props }) => props.testID === "city-carousel")!;
-  await act(async () =>
-    viewport.props.onLayout({ nativeEvent: { layout: { width: 340 } } }),
-  );
-  const carousel = root
-    .findAllByType(ScrollView)
-    .find(({ props }) => props.horizontal)!;
-  expect(carousel.props.snapToInterval).toBe(292);
-  const arrow = (label: string) => root.findAllByProps({ accessibilityLabel: label })[0];
-  const prev = arrow("Cidade anterior");
-  const next = arrow("Próxima cidade");
-  expect(prev.props.disabled).toBe(true);
-  expect(next.props.disabled).toBe(false);
-  await act(async () => next.props.onPress());
-  expect(root.findByType(Button).props.title).toBe("Explorar Santo Antônio do Pinhal");
-  await act(async () => prev.props.onPress());
-  expect(root.findByType(Button).props.title).toBe("Explorar Campos do Jordão");
-  await act(async () => root.findAllByProps({ accessibilityLabel: "Mostrar Monteiro Lobato" })[0].props.onPress());
-  expect(next.props.disabled).toBe(true);
-  await act(async () =>
-    carousel.props.onScroll({ nativeEvent: { contentOffset: { x: 292 } } }),
-  );
-  expect(root.findByType(Button).props.title).toBe(
-    "Explorar Santo Antônio do Pinhal",
-  );
+  for (const item of [valley, mountain, coast])
+    expect(item.props["aria-expanded"]).toBe(false);
+  expect(entry("Aparecida")).toBeUndefined();
+
+  await act(async () => valley.props.onPress());
+  expect(valley.props["aria-expanded"]).toBe(true);
+  expect(entry("Aparecida")).toBeDefined();
+  const valleyCities = [
+    "Aparecida",
+    "Caçapava",
+    "Cunha",
+    "Paraibuna",
+    "São José dos Campos",
+    "Taubaté",
+  ];
   expect(
-    root.findAllByProps({ accessibilityLabel: "Mostrar Caçapava" }),
-  ).toHaveLength(0);
-  const dot = root.findAllByProps({
-    accessibilityLabel: "Mostrar São Bento do Sapucaí",
-  })[0];
-  await act(async () => dot.props.onPress());
-  expect(dot.props.accessibilityState.selected).toBe(true);
-  expect(mockScrollTo).toHaveBeenLastCalledWith(
-    expect.objectContaining({ x: 584 }),
-  );
-  expect(await readPreferences()).toMatchObject({ region: "", city: "" });
+    view.root
+      .findAllByType(Tap)
+      .map(({ props }) => props.accessibilityLabel)
+      .filter((label) => valleyCities.includes(label)),
+  ).toEqual(valleyCities);
+  expect(entry("Ubatuba")).toBeUndefined();
+  await act(async () => valley.props.onPress());
+  expect(entry("Aparecida")).toBeUndefined();
 
-  const explore = root.findByType(Button);
-  expect(explore.props.title).toBe("Explorar São Bento do Sapucaí");
-  await act(async () => explore.props.onPress());
+  await act(async () => coast.props.onPress());
+  expect(entry("Ubatuba")).toBeDefined();
+  await act(async () => mountain.props.onPress());
+  expect(mountain.props["aria-expanded"]).toBe(true);
+  expect(coast.props["aria-expanded"]).toBe(false);
+  expect(entry("Ubatuba")).toBeUndefined();
+  expect(entry("Caçapava")).toBeUndefined();
+  expect(await readPreferences()).toMatchObject({ region: "", city: "" });
+  expect(mockReset).not.toHaveBeenCalled();
+  expect(mockNavigate).not.toHaveBeenCalled();
+
+  await act(async () => entry("São Bento do Sapucaí")!.props.onPress());
   expect(mockReset).toHaveBeenCalledWith({
     index: 0,
     routes: [{ name: "Home" }],
@@ -146,13 +112,10 @@ it("visitante escolhe região e cidade, desliza ou toca nas bolinhas e entra sem
   expect(saved.city).toBe("São Bento do Sapucaí");
   expect(saved.authenticated).toBeUndefined();
   expect(saved.profile).toBeUndefined();
-  await act(async () => {
-    view.unmount();
-  });
+  await act(async () => view.unmount());
 });
 
 it("logo retorna para a Home e limpa a navegação anterior", async () => {
-  const { BrandHeader } = require("../src/components/ui");
   let view!: ReactTestRenderer;
   await act(async () => {
     view = create(
@@ -176,4 +139,65 @@ it("logo retorna para a Home e limpa a navegação anterior", async () => {
     routes: [{ name: "Home" }],
   });
   await act(async () => view.unmount());
+});
+
+it("mantém a cidade na linha da logo com reticências e acesso ao seletor", async () => {
+  const key = "vale-serra-mar:preferences:v2";
+  const city = "Santo Antônio do Pinhal";
+  await AsyncStorage.setItem(
+    key,
+    JSON.stringify({
+      city,
+      region: "Serra da Mantiqueira",
+      interests: [],
+      favorites: [],
+      recent: [],
+    }),
+  );
+  mockNavigate.mockClear();
+
+  let view: ReactTestRenderer | undefined;
+  try {
+    await act(async () => {
+      view = create(
+        React.createElement(
+          StoreProvider,
+          null,
+          React.createElement(BrandHeader),
+        ),
+      );
+    });
+    const buttons = view!.root.findAllByType(Tap);
+    const logo = buttons.find(
+      ({ props }) => props.accessibilityLabel === "Ir para o início",
+    )!;
+    const location = buttons.find(
+      ({ props }) => props.accessibilityLabel === `Alterar cidade, ${city}`,
+    )!;
+    expect(location.parent).toBe(logo.parent);
+    expect(StyleSheet.flatten(location.parent!.props.style)).toMatchObject({
+      flexDirection: "row",
+      flexWrap: "nowrap",
+      alignItems: "center",
+    });
+    expect(StyleSheet.flatten(logo.props.style)).toMatchObject({
+      width: "40%",
+      maxWidth: 128,
+    });
+    expect(StyleSheet.flatten(location.props.style)).toMatchObject({
+      flexShrink: 1,
+      minWidth: 0,
+    });
+    const label = location.findByType(Text);
+    expect(label.props).toMatchObject({
+      children: city,
+      numberOfLines: 1,
+      ellipsizeMode: "tail",
+    });
+    await act(async () => location.props.onPress());
+    expect(mockNavigate).toHaveBeenCalledWith("ChooseCity");
+  } finally {
+    await act(async () => view?.unmount());
+    await AsyncStorage.removeItem(key);
+  }
 });

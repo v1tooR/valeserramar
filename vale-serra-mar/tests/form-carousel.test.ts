@@ -16,6 +16,8 @@ import {
   type ReactTestInstance,
   type ReactTestRenderer,
 } from "react-test-renderer";
+import { BannerImage, BusinessPhotos, PhotoViewer, bannerAspectRatio } from "../src/components/BusinessPhotos";
+import { Tap } from "../src/components/Motion";
 import { HighlightCarousel } from "../src/components/HighlightCarousel";
 import { AdvertiserRegistrationContext, Chip, Field, Page } from "../src/components/ui";
 import { AuthScreen } from "../src/screens/OnboardingBusiness";
@@ -202,6 +204,8 @@ it("sincroniza a seleção das bolinhas com a rotação automática e o gesto de
   expect(
     root.findAllByType(Image).map(({ props }) => props.resizeMode),
   ).toEqual(businesses.map(() => "contain"));
+  expect(bannerAspectRatio).toBe(4 / 3);
+  expect(root.findAllByType(BannerImage)).toHaveLength(businesses.length);
   const banner = root.findByProps({
     accessibilityLabel: "Abrir " + businesses[0].name,
   });
@@ -247,7 +251,8 @@ it("distribui os 16 marcadores em duas linhas em uma tela estreita", async () =>
 });
 
 it.each([
-  [1920, 1080, false],
+  [1600, 1200, false],
+  [1920, 1080, true],
   [1000, 1000, true],
   [900, 1600, true],
   [1920, 720, true],
@@ -359,4 +364,54 @@ it("rola até o campo de e-mail em foco quando o teclado encolhe o formulário n
   expect(mockScrollTo).not.toHaveBeenCalled();
   await act(async () => scroll.props.onLayout(layout(320, 290)));
   expect(mockScrollTo).toHaveBeenCalledWith({ y: 154, animated: true });
+});
+
+it("organiza quatro miniaturas quadradas por página e abre a foto da página seguinte", async () => {
+  const photos = Array.from({ length: 7 }, (_, i) => `https://example.test/foto-${i}.jpg`);
+  const onOpen = jest.fn();
+  await act(async () => {
+    tree = create(React.createElement(BusinessPhotos, { photos, onOpen }));
+  });
+  const root = tree!.root;
+  const viewport = root.findAllByType(View).find(({ props }) => props.testID === "photo-strip")!;
+  await act(async () => viewport.props.onLayout(layout(320, 74)));
+  const track = root.findByType(ScrollView);
+  const pages = React.Children.toArray(track.props.children) as React.ReactElement<{ "aria-hidden": boolean }>[];
+  expect(pages).toHaveLength(2);
+  expect(pages[0].props["aria-hidden"]).toBe(false);
+  expect(pages[1].props["aria-hidden"]).toBe(true);
+  const thumbs = root.findAllByType(Tap).filter(
+    ({ props }) => props.accessibilityLabel.startsWith("Ver foto "),
+  );
+  expect(thumbs.slice(0, 4).every((thumb) => thumb.props.focusable)).toBe(true);
+  expect(thumbs.slice(4).every((thumb) => !thumb.props.focusable)).toBe(true);
+  expect(StyleSheet.flatten(thumbs[0].props.style).aspectRatio).toBe(1);
+  const next = root.findAllByType(Tap).find(
+    ({ props }) => props.accessibilityLabel === "Próxima página de fotos",
+  )!;
+  await act(async () => next.props.onPress());
+  expect(mockScrollTo).toHaveBeenLastCalledWith({ x: 320, animated: true });
+  expect(next.props.disabled).toBe(true);
+  expect(thumbs[4].props.focusable).toBe(true);
+  await act(async () => thumbs[4].props.onPress());
+  expect(onOpen).toHaveBeenCalledWith(5);
+});
+
+it("abre o visualizador no índice solicitado e usa as proporções da foto", async () => {
+  const photos = Array.from({ length: 8 }, (_, i) => `https://example.test/foto-${i}.jpg`);
+  await act(async () => {
+    tree = create(React.createElement(PhotoViewer, { photos, initialIndex: 5 }));
+  });
+  const root = tree!.root;
+  const viewport = root.findAllByType(View).find(({ props }) => props.testID === "photo-viewer")!;
+  await act(async () => viewport.props.onLayout(layout(320, 480)));
+  expect(mockScrollTo).toHaveBeenLastCalledWith({ x: 1600, animated: false });
+  const images = root.findAllByType(Image);
+  expect(images.map(({ props }) => props.resizeMode)).toEqual(["contain", "contain", "contain"]);
+  expect(images[1].props.source).toEqual({ uri: photos[5] });
+  expect(images[1].parent?.props["aria-hidden"]).toBe(false);
+  const prev = root.findAllByType(Tap).find(({ props }) => props.accessibilityLabel === "Foto anterior")!;
+  await act(async () => prev.props.onPress());
+  expect(mockScrollTo).toHaveBeenLastCalledWith({ x: 1280, animated: true });
+  expect(root.findAllByType(Image)[1].props.source).toEqual({ uri: photos[4] });
 });

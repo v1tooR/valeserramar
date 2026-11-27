@@ -4,6 +4,7 @@ import { Tap as Pressable } from "../components/Motion";
 import React, { useState } from "react";
 import { Image, Share, Text, View, useWindowDimensions } from "react-native";
 import { photoSource } from "../assets";
+import { BusinessPhotos, PhotoViewer, businessPhotos } from "../components/BusinessPhotos";
 import { ProductPrice } from "../components/ProductPrice";
 import { useStore } from "../store";
 import { useNav, type ScreenProps } from "../navigation";
@@ -121,6 +122,9 @@ export function BusinessScreen({ route }: ScreenProps) {
   const offers = b.status === "Aprovado"
     ? state.products.filter((product) => product.businessId === b.id && activeOffer(product))
     : [];
+  const photos = businessPhotos(b);
+  const openPhoto = (photoIndex: number) =>
+    nav.navigate("Gallery", { businessId: b.id, photoIndex, preview: route.params?.preview });
   return (
     <Page
       title={b.name}
@@ -167,17 +171,7 @@ export function BusinessScreen({ route }: ScreenProps) {
       {route.params?.preview && (
         <Notice>Prévia do seu anúncio. Publicação depende da aprovação.</Notice>
       )}
-      <Pressable
-        onPress={() => nav.navigate("Gallery", { businessId: b.id })}
-        accessibilityRole="button"
-        accessibilityLabel="Ver fotos"
-      >
-        <Image
-          source={photoSource(b.photo)}
-          style={{ width: "100%", height: hotel ? 250 : 265, borderRadius: 18 }}
-          resizeMode="cover"
-        />
-      </Pressable>
+      {photos.length > 0 && <BusinessPhotos photos={photos} onOpen={openPhoto} />}
       <View style={s.between}>
         {hotel && !!b.logo && (
           <Image
@@ -263,10 +257,10 @@ export function BusinessScreen({ route }: ScreenProps) {
             {
               title: "Fotos",
               icon: "image",
-              action: () => nav.navigate("Gallery", { businessId: b.id }),
+              action: () => openPhoto(0),
             },
           ] as const
-        ).map((item) => (
+        ).filter(({ title }) => title !== "Fotos" || photos.length > 0).map((item) => (
           <Pressable
             key={item.title}
             accessibilityRole="button"
@@ -395,17 +389,24 @@ export function BusinessScreen({ route }: ScreenProps) {
 export function GalleryScreen({ route }: ScreenProps) {
   const { state } = useStore();
   const b = state.businesses.find((b) => b.id === route.params?.businessId);
+  if (!b || (b.status !== "Aprovado" && !(route.params?.preview && state.authenticated && b.owner))) {
+    return (
+      <Page title="Fotos">
+        <Notice>Este estabelecimento não está disponível.</Notice>
+      </Page>
+    );
+  }
+  const photos = businessPhotos(b);
+  if (!photos.length) {
+    return (
+      <Page title="Fotos">
+        <Notice>Este estabelecimento ainda não tem fotos.</Notice>
+      </Page>
+    );
+  }
   return (
-    <Page title="Fotos">
-      {b &&
-        [b.photo, ...b.gallery.filter((p) => p !== b.photo)].map((p, i) => (
-          <Image
-            key={i}
-            source={photoSource(p)}
-            style={{ width: "100%", aspectRatio: 1.3, borderRadius: 16 }}
-            resizeMode="cover"
-          />
-        ))}
+    <Page title="Fotos" subtitle={b.name} scroll={false}>
+      <PhotoViewer photos={photos} initialIndex={route.params?.photoIndex ?? 0} />
     </Page>
   );
 }

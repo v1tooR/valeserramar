@@ -218,8 +218,8 @@ export function AuthScreen({ route }: { route?: ScreenProps["route"] }) {
         }
         onPress={() => {
           if (selection || fromProfile) nav.goBack();
-          else if (state.region) nav.navigate("Home");
-          else nav.popTo("Welcome");
+          else if (state.region && state.city) nav.navigate("Home");
+          else nav.popTo("ChooseCity");
         }}
       />
     </Page>

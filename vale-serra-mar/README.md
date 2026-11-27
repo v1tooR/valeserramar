@@ -15,7 +15,7 @@ O sufixo `.cmd` evita o bloqueio de scripts PowerShell do seu computador. Abra o
 
 ## Sem backend configurado
 
-Você consegue escolher região, navegar, abrir as categorias, alterar interesses e acessar os formulários de entrada/cadastro. O catálogo não terá negócios. Operações remotas apresentam indisponibilidade e permitem tentar novamente. Nenhum login, cadastro enviado, pagamento ou reserva é confirmado artificialmente.
+Você consegue escolher uma cidade por região, navegar, abrir as categorias e acessar os formulários de entrada/cadastro. O catálogo não terá negócios. Operações remotas apresentam indisponibilidade e permitem tentar novamente. Nenhum login, cadastro enviado, pagamento ou reserva é confirmado artificialmente.
 
 Os formulários de gerenciamento são protegidos por sessão real. Eles ficam disponíveis depois que a API autenticar o anunciante. Rascunhos digitados pelo próprio anunciante podem ser preparados em memória antes do envio. Não são anúncios publicados e se perdem ao fechar o app ou sair da conta. Preferências, favoritos e buscas recentes permanecem no aparelho.
 

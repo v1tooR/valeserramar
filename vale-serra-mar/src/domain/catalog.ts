@@ -1,5 +1,10 @@
 import { assets } from "../assets";
 import type { Business, CatalogFilters, Hours, Segment, State } from "./models";
+export const compareNames = new Intl.Collator("pt-BR", {
+  sensitivity: "base",
+  numeric: true,
+}).compare;
+
 export const regions = [
   {
     name: "Vale do Paraíba",
@@ -28,7 +33,11 @@ export const regions = [
     cities: ["Ubatuba", "Caraguatatuba", "Ilhabela", "São Sebastião"],
     photo: assets.regionCoast,
   },
-];
+].map((region) => ({ ...region, cities: region.cities.sort(compareNames) }))
+  .sort((a, b) => compareNames(a.name, b.name));
+
+export const allCities = regions.flatMap(({ cities }) => cities).sort(compareNames);
+
 export const cityKey = (city: string) =>
   city.normalize("NFD").replace(/[\u0300-\u036f\s]/g, "").toLowerCase();
 
@@ -107,7 +116,7 @@ export function emptyBusiness(id: string): Business {
     id,
     name: "",
     segment: "Restaurantes",
-    region: regions[0].name,
+    region: "Vale do Paraíba",
     city: "Caçapava",
     district: "",
     description: "",
