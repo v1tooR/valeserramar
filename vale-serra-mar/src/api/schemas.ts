@@ -44,6 +44,10 @@ export const businessSchema = z.object({
   cep: z.string(),
   number: z.string(),
   phone: z.string(),
+  publicInfo: z.object({
+    cnpj: z.string().regex(/^[A-Z0-9]{12}\d{2}$/).optional().catch(undefined),
+    email: z.email().optional().catch(undefined),
+  }).optional().catch(undefined),
   instagram: z.string(),
   latitude: z.number().min(-90).max(90).nullable(),
   longitude: z.number().min(-180).max(180).nullable(),

@@ -17,7 +17,7 @@ import {
   type ReactTestRenderer,
 } from "react-test-renderer";
 import { HighlightCarousel } from "../src/components/HighlightCarousel";
-import { AdvertiserRegistrationContext, Field, Page } from "../src/components/ui";
+import { AdvertiserRegistrationContext, Chip, Field, Page } from "../src/components/ui";
 import { AuthScreen } from "../src/screens/OnboardingBusiness";
 import { businesses } from "./fixtures";
 
@@ -141,6 +141,21 @@ async function renderCarousel(
   mockScrollTo.mockClear();
   return tree!.root;
 }
+
+it("permite escolher a cidade dos destaques numa busca regional", async () => {
+  const other = { ...businesses[0], id: "taubate", name: "Café de Taubaté", city: "Taubaté" };
+  const root = await renderCarousel([...businesses, other]);
+  const [cacapava, taubate] = root.findAllByType(Chip);
+  expect(cacapava.props.title).toBe("Caçapava");
+  expect(taubate.props.title).toBe("Taubaté");
+  expect(cacapava.props.selected).toBe(true);
+  expect(carouselDots(root)).toHaveLength(businesses.length);
+  await act(async () => taubate.props.onPress());
+  expect(taubate.props.selected).toBe(true);
+  expect(carouselDots(root)).toHaveLength(0);
+  await act(async () => root.findByProps({ accessibilityLabel: "Abrir " + other.name }).props.onPress());
+  expect(mockNavigate).toHaveBeenCalledWith("Business", { businessId: other.id });
+});
 
 it("mostra o anúncio antes dos estabelecimentos e inclui o slide na paginação", async () => {
   const advertise = jest.fn();

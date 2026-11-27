@@ -50,6 +50,10 @@ export const businessSchema = z.object({
   cep: z.string(),
   number: z.string(),
   phone: z.string(),
+  publicInfo: z.object({
+    cnpj: z.string().regex(/^[A-Z0-9]{12}\d{2}$/).optional(),
+    email: z.email().max(254).optional(),
+  }).optional(),
   instagram: z.string(),
   latitude: z.number().min(-90).max(90).nullable(),
   longitude: z.number().min(-180).max(180).nullable(),
@@ -168,7 +172,7 @@ export const tableReservationsInput = z.strictObject({
   acceptsReservations: z.boolean(),
 });
 export const businessInput = businessSchema
-  .omit({ id: true, owner: true, status: true, correction: true, highlights: true })
+  .omit({ id: true, owner: true, status: true, correction: true, highlights: true, publicInfo: true })
   .extend({
     photo: image,
     logo: image.optional(),

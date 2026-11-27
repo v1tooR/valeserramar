@@ -11,11 +11,12 @@ import {
   type ImageSourcePropType,
 } from "react-native";
 import { photoSource } from "../assets";
+import { cityKey } from "../domain/catalog";
 import type { Business } from "../domain/models";
 import { useNav } from "../navigation";
 import { colors as c, styles as s } from "../theme";
 import { Tap } from "./Motion";
-import { Icon, Section } from "./ui";
+import { Chip, Icon, Section } from "./ui";
 import { usePagedCarousel } from "./usePagedCarousel";
 
 const autoAdvanceMs = 5000;
@@ -71,8 +72,19 @@ export function HighlightCarousel({
   onAdvertise?: () => void;
 }) {
   const nav = useNav();
-  const slides = businesses.map((business) => business.id).join(",");
-  const count = businesses.length + (onAdvertise ? 1 : 0);
+  const [selectedCity, setSelectedCity] = useState("");
+  const groups = new Map<string, { label: string; banners: Business[] }>();
+  for (const business of businesses) {
+    const key = cityKey(business.city);
+    const group = groups.get(key);
+    if (group) group.banners.push(business);
+    else groups.set(key, { label: business.city, banners: [business] });
+  }
+  const cities = [...groups].sort(([, a], [, b]) => a.label.localeCompare(b.label, "pt-BR"));
+  const city = groups.has(selectedCity) ? selectedCity : cities[0]?.[0] ?? "";
+  const banners = groups.get(city)?.banners ?? [];
+  const slides = banners.map((business) => business.id).join(",");
+  const count = banners.length + (onAdvertise ? 1 : 0);
   const { current, goTo, width, onLayout, scrollProps } = usePagedCarousel(
     count,
     onAdvertise ? `advertise:${slides}` : slides,
@@ -87,7 +99,24 @@ export function HighlightCarousel({
 
   return (
     <View style={styles.section}>
-      {businesses.length > 0 && <Section title="Em destaque" />}
+      {banners.length > 0 && <Section title="Em destaque" />}
+      {cities.length > 1 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          accessibilityLabel="Cidades dos destaques"
+          contentContainerStyle={styles.cities}
+        >
+          {cities.map(([key, group]) => (
+            <Chip
+              key={key}
+              title={group.label}
+              selected={key === city}
+              onPress={() => setSelectedCity(key)}
+            />
+          ))}
+        </ScrollView>
+      )}
       <View onLayout={onLayout}>
         {width > 0 && (
           <ScrollView {...scrollProps}>
@@ -130,7 +159,7 @@ export function HighlightCarousel({
                 </Tap>
               </View>
             )}
-            {businesses.map((business) => (
+            {banners.map((business) => (
               <View key={business.id} style={[styles.slide, { width }]}>
                 <Tap
                   accessibilityRole="button"
@@ -189,6 +218,7 @@ export function HighlightCarousel({
 
 const styles = StyleSheet.create({
   section: { gap: 8 },
+  cities: { gap: 6, paddingHorizontal: 6 },
   slide: { paddingHorizontal: 6, paddingTop: 3, paddingBottom: 18 },
   card: {
     flexGrow: 1,

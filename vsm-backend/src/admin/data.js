@@ -16,6 +16,7 @@ export const highlightPlacements = {
 
 export function canHighlight(business) {
   return business.status === "Aprovado" && !business.deleted_at && !business.owner_deleted_at &&
+    typeof business.data?.city === "string" && Boolean(business.data.city.trim()) &&
     typeof business.data?.photo === "string" && Boolean(business.data.photo.trim());
 }
 
@@ -112,7 +113,9 @@ export async function businessDetails(db, id) {
       count(*) FILTER(WHERE data->>'status'='Pendente')::int AS pending
       FROM vsm.bookings WHERE business_id=$1`, [id]),
     row(db, `SELECT count(home_highlight)::int AS home,
-      count(explore_highlight)::int AS explore FROM vsm.businesses`),
+      count(explore_highlight)::int AS explore FROM vsm.businesses
+      WHERE vsm.highlight_city_key(data->>'city')=vsm.highlight_city_key($1)
+        AND (home_highlight IS NOT NULL OR explore_highlight IS NOT NULL)`, [business.data.city]),
   ]);
   return { business, products, activity, subscription, bookings, highlights };
 }
@@ -133,17 +136,21 @@ export async function setBusinessHighlight(db, id, placement, enabled) {
     if (business.owner_deleted_at)
       fail(409, "Restaure o anunciante antes de publicar um destaque.");
     if (!canHighlight(business))
-      fail(409, "Para publicar o destaque, o estabelecimento precisa estar aprovado e ter uma foto de capa.");
+      fail(409, "Para publicar o destaque, aprove o estabelecimento e informe a cidade e a foto de capa.");
     const updated = await row(client, `
       UPDATE vsm.businesses SET ${column}=slot.number
       FROM (
         SELECT number FROM generate_series(1,$2::int) AS slot(number)
-        WHERE NOT EXISTS (SELECT 1 FROM vsm.businesses WHERE ${column}=slot.number)
+        WHERE NOT EXISTS (
+          SELECT 1 FROM vsm.businesses
+          WHERE ${column}=slot.number
+            AND vsm.highlight_city_key(data->>'city')=vsm.highlight_city_key($3)
+        )
         ORDER BY number LIMIT 1
       ) AS slot
       WHERE id=$1 RETURNING id
-    `, [id, highlightLimit]);
-    if (!updated) fail(409, `As ${highlightLimit} vagas de ${label} estão ocupadas.`);
+    `, [id, highlightLimit, business.data.city]);
+    if (!updated) fail(409, `As ${highlightLimit} vagas de ${label} em ${business.data.city} estão ocupadas.`);
   });
 }
 

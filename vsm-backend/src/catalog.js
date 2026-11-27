@@ -187,7 +187,7 @@ export function catalogRoutes(app, db, origin) {
         const changed = await row(
           client,
           "UPDATE vsm.businesses SET data=$2, status=CASE WHEN status='Aprovado' THEN 'Rascunho' ELSE status END WHERE id=$1 RETURNING *",
-          [b.id, data],
+          [b.id, { ...data, publicInfo: b.data.publicInfo }],
         );
         return businessView(changed, true);
       });

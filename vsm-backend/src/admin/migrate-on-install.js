@@ -12,6 +12,7 @@ try {
       "005_business_highlights.sql",
       "006_admin_advertisers.sql",
       "007_advertiser_permanent_deletion.sql",
+      "009_highlights_by_city.sql",
     ]) {
       await client.query(await readFile(new URL("../../sql/" + file, import.meta.url), "utf8"));
     }

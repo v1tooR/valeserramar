@@ -73,6 +73,24 @@ it("mantém 15 banners por local e respeita a categoria selecionada", () => {
 });
 it("soma quantidade e adicionais sem cobrar reserva", () =>
   expect(cartTotal([item])).toBeCloseTo(191.8));
+it("mantém 15 destaques em cada cidade quando a busca inclui várias cidades", () => {
+  const cityHighlights = ["Caçapava", "Taubaté"].flatMap(city =>
+    Array.from({ length: 15 }, (_, index) => ({
+      ...businesses[0],
+      id: `${city}-${index}`,
+      city,
+      photo: "https://example.test/capa.png",
+      highlights: { home: index + 1, explore: index + 1 },
+    })),
+  );
+  const duplicate = { ...cityHighlights[0], id: "duplicado", city: " CACAPAVA " };
+  for (const placement of ["home", "explore"] as const) {
+    const result = highlightedBusinesses([...cityHighlights, duplicate], placement);
+    expect(result.filter(b => b.city === "Caçapava")).toEqual(cityHighlights.slice(0, 15));
+    expect(result.filter(b => b.city === "Taubaté")).toEqual(cityHighlights.slice(15));
+    expect(result).toHaveLength(30);
+  }
+});
 it("rejeita item removido, indisponível ou com preço alterado", () => {
   expect(validateCart([item], products)).toBe("");
   expect(validateCart([item], [])).not.toBe("");

@@ -2,11 +2,6 @@ ALTER TABLE vsm.businesses
   ADD COLUMN IF NOT EXISTS home_highlight smallint CHECK (home_highlight BETWEEN 1 AND 15),
   ADD COLUMN IF NOT EXISTS explore_highlight smallint CHECK (explore_highlight BETWEEN 1 AND 15);
 
-CREATE UNIQUE INDEX IF NOT EXISTS businesses_home_highlight
-  ON vsm.businesses(home_highlight) WHERE home_highlight IS NOT NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS businesses_explore_highlight
-  ON vsm.businesses(explore_highlight) WHERE explore_highlight IS NOT NULL;
-
 CREATE OR REPLACE FUNCTION vsm.release_unavailable_highlights()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN

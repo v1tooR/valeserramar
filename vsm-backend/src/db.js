@@ -44,6 +44,7 @@ export async function migrate(db) {
       "006_admin_advertisers.sql",
       "007_advertiser_permanent_deletion.sql",
       "008_product_offers.sql",
+      "009_highlights_by_city.sql",
     ]) {
       await client.query(
         await readFile(new URL("../sql/" + migration, import.meta.url), "utf8"),

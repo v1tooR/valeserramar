@@ -110,21 +110,26 @@ export function highlightedBusinesses(
   businesses: Business[],
   placement: HighlightPlacement,
 ) {
+  const occupiedSlots = new Set<string>();
   return businesses
     .flatMap((business) => {
       const slot = business.highlights?.[placement];
-      return business.status === "Aprovado" &&
-        typeof business.photo === "string" &&
-        business.photo.trim() &&
-        typeof slot === "number" &&
-        Number.isInteger(slot) &&
-        slot >= 1 &&
-        slot <= 15
-        ? [{ business, slot }]
-        : [];
+      if (
+        business.status !== "Aprovado" ||
+        typeof business.photo !== "string" ||
+        !business.photo.trim() ||
+        typeof slot !== "number" ||
+        !Number.isInteger(slot) ||
+        slot < 1 ||
+        slot > 15
+      ) return [];
+      const city = cityKey(business.city);
+      const key = `${city}:${slot}`;
+      if (!city || occupiedSlots.has(key)) return [];
+      occupiedSlots.add(key);
+      return [{ business, slot }];
     })
     .sort((a, b) => a.slot - b.slot)
-    .slice(0, 15)
     .map(({ business }) => business);
 }
 

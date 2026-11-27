@@ -73,6 +73,7 @@ export interface Business {
   cep: string;
   number: string;
   phone: string;
+  publicInfo?: { cnpj?: string; email?: string };
   instagram: string;
   latitude: number | null;
   longitude: number | null;

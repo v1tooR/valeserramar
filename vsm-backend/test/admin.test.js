@@ -299,12 +299,26 @@ test("Painel web: sessão, revisão com histórico, publicação e consultas de 
     assert.equal((await publishHighlight(createdId, "home", false)).statusCode, 303);
     assert.deepEqual((await app.inject("/catalog")).json().businesses[0].highlights, { home: null, explore: 1 });
     assert.equal((await publishHighlight(createdId, "home", true)).statusCode, 303);
+    // A instalação anterior usava índices únicos globais para as duas posições.
+    await db.query(`CREATE UNIQUE INDEX businesses_home_highlight
+      ON vsm.businesses(home_highlight) WHERE home_highlight IS NOT NULL;
+      CREATE UNIQUE INDEX businesses_explore_highlight
+      ON vsm.businesses(explore_highlight) WHERE explore_highlight IS NOT NULL`);
+    await migrate(db);
+    assert.deepEqual((await app.inject("/catalog")).json().businesses[0].highlights, { home: 1, explore: 1 });
+
     const { rows: capacity } = await db.query(`
       INSERT INTO vsm.businesses (id, owner_id, status, data, home_highlight)
-      SELECT gen_random_uuid(), $1, 'Aprovado', $2, CASE WHEN slot < 15 THEN slot END
+      SELECT gen_random_uuid(), $1, 'Aprovado',
+        CASE WHEN slot=16 THEN jsonb_set($2::jsonb, '{city}', '" CACAPAVA "') ELSE $2::jsonb END,
+        CASE WHEN slot < 15 THEN slot END
       FROM generate_series(2,16) AS slot
       RETURNING id, home_highlight
     `, [account.id, published]);
+    const { rows: [otherCity] } = await db.query(`
+      INSERT INTO vsm.businesses (id, owner_id, status, data)
+      VALUES(gen_random_uuid(), $1, 'Aprovado', $2) RETURNING id
+    `, [account.id, { ...published, name: "Café de Taubaté", city: "Taubaté" }]);
     try {
       const contenders = capacity.filter(b => b.home_highlight === null);
       const attempts = await Promise.all(contenders.map(b => publishHighlight(b.id, "home", true)));
@@ -313,8 +327,38 @@ test("Painel web: sessão, revisão com histórico, publicação e consultas de 
       const fullCatalog = (await app.inject("/catalog")).json().businesses;
       assert.equal(fullCatalog.filter(b => b.highlights?.home).length, 15);
       assert.equal(fullCatalog.filter(b => b.highlights?.explore).length, 1);
+      const localPanel = await get(createdPath, cookie);
+      assert.match(localPanel.body, /Vagas de destaque em <strong>Caçapava<\/strong>/);
+      assert.match(localPanel.body, /15 de 15 vagas ocupadas/);
+      const otherPath = "/admin/estabelecimentos/" + otherCity.id;
+      const otherPanel = await get(otherPath, cookie);
+      assert.match(otherPanel.body, /Vagas de destaque em <strong>Taubaté<\/strong>/);
+      assert.match(otherPanel.body, /0 de 15 vagas ocupadas/);
+      assert.equal((await publishHighlight(otherCity.id, "home", true)).statusCode, 303);
+      assert.equal((await publishHighlight(otherCity.id, "explore", true)).statusCode, 303);
+      const { rows: otherSlots } = await db.query(`
+        INSERT INTO vsm.businesses (id, owner_id, status, data, home_highlight, explore_highlight)
+        SELECT gen_random_uuid(), $1, 'Aprovado', $2,
+          CASE WHEN slot <= 15 THEN slot END, CASE WHEN slot <= 15 THEN slot END
+        FROM generate_series(2,16) AS slot RETURNING id,home_highlight
+      `, [account.id, { ...published, city: "Taubaté" }]);
+      capacity.push(...otherSlots);
+      const extra = otherSlots.find(b => b.home_highlight === null);
+      assert.equal((await publishHighlight(extra.id, "home", true)).statusCode, 409);
+      assert.equal((await publishHighlight(extra.id, "explore", true)).statusCode, 409);
+      await migrate(db);
+      const catalogByCity = (await app.inject("/catalog")).json().businesses;
+      assert.equal(catalogByCity.filter(b => b.highlights?.home).length, 30);
+      assert.equal(catalogByCity.filter(b => b.highlights?.explore).length, 16);
+      assert.deepEqual(catalogByCity.find(b => b.id === otherCity.id).highlights, { home: 1, explore: 1 });
+
+      await db.query(`UPDATE vsm.businesses SET data=jsonb_set(data, '{city}', '"Caçapava"') WHERE id=$1`,
+        [otherCity.id]);
+      const moved = (await app.inject("/catalog")).json().businesses.find(b => b.id === otherCity.id);
+      assert.equal(moved.city, "Caçapava");
+      assert.equal(moved.highlights, undefined);
     } finally {
-      await db.query("DELETE FROM vsm.businesses WHERE id=ANY($1::uuid[])", [capacity.map(b => b.id)]);
+      await db.query("DELETE FROM vsm.businesses WHERE id=ANY($1::uuid[])", [[otherCity.id, ...capacity.map(b => b.id)]]);
     }
 
     const blankSignup = await get(signup, staffCookie);

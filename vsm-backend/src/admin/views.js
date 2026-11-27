@@ -284,6 +284,8 @@ export function registrationPage(session, values, { message = "", business, orig
       ${business ? `<input type="hidden" name="version" value="${e(values.version ?? business.version)}">` : ""}
       ${message ? `<p class="alert error" role="alert">${e(message)}</p>` : ""}
       ${business?.status === "Aprovado" ? '<p class="alert">As alterações salvas serão exibidas no catálogo do app.</p>' : ""}
+      ${business?.home_highlight || business?.explore_highlight
+        ? '<p class="muted">Ao mudar de cidade, publique os destaques novamente na cidade nova.</p>' : ""}
       <section class="card padded">
         <h2>Anunciante</h2>
         <div class="registration-owner">
@@ -304,6 +306,8 @@ export function registrationPage(session, values, { message = "", business, orig
           <label class="form-wide">Descrição<textarea name="description" rows="4" maxlength="2000"${required ? " required" : ""}>${e(values.description)}</textarea></label>
           ${registrationInput(values, "phone", "Telefone comercial com DDD", 40, required, "tel")}
           ${registrationInput(values, "instagram", "Instagram (opcional)", 120)}
+          ${registrationInput({ cnpj: business?.data.publicInfo?.cnpj, ...values }, "cnpj", "CNPJ público (opcional)", 18)}
+          ${registrationInput({ publicEmail: business?.data.publicInfo?.email, ...values }, "publicEmail", "E-mail público (opcional)", 254, false, "email")}
         </div>
       </section>
       <section class="card padded">
@@ -403,8 +407,8 @@ function highlightSettings(business, counts, session) {
   return `<section class="card padded">
     <h2>Destaques no app</h2>
     <p class="muted">${eligible
-      ? "A foto de capa será exibida como banner nos locais selecionados."
-      : "Para publicar um destaque, aprove o estabelecimento e adicione uma foto de capa."}</p>
+      ? `Vagas de destaque em <strong>${e(business.data.city)}</strong>. A foto de capa será exibida como banner.`
+      : "Para publicar um destaque, aprove o estabelecimento e informe a cidade e a foto de capa."}</p>
     ${eligible ? Object.entries(highlightPlacements).map(([placement, { label, column }]) => {
       const active = Boolean(business[column]);
       return `<div class="highlight-setting">
@@ -459,6 +463,8 @@ export function businessPage({ business: b, products, activity, subscription, bo
           ${details([
             ["Categoria", category], ["Endereço", address], ["CEP", data.cep],
             ["Telefone comercial", data.phone], ["Instagram", data.instagram],
+            ...(data.publicInfo?.cnpj ? [["CNPJ público", data.publicInfo.cnpj]] : []),
+            ...(data.publicInfo?.email ? [["E-mail público", data.publicInfo.email]] : []),
             ["Coordenadas", typeof data.latitude === "number" && typeof data.longitude === "number" ?
               data.latitude + ", " + data.longitude : ""],
             ["Reservas no app", data.acceptsReservations ? "Habilitadas" : "Desabilitadas"],

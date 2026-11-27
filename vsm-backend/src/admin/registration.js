@@ -17,7 +17,7 @@ export { regions };
 
 export const weekdays = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 const photoFields = new Set(["photo", "logo"]);
-const formFields = 42 + 30; // Includes removal controls for galleries saved under the former limit.
+const formFields = 44 + 30; // Includes removal controls for galleries saved under the former limit.
 const formFiles = maxGalleryPhotos + photoFields.size;
 const locations = new Map(regions.flatMap(({ name, cities }) =>
   cities.map(city => [name + "|" + city, { city, region: name }])));
@@ -160,6 +160,14 @@ function businessData(values) {
   };
   const business = businessInput.safeParse({ ...newBusinessDefaults, ...fields });
   if (!business.success) fail(422, "Confira os dados do estabelecimento.");
+  if ("cnpj" in values || "publicEmail" in values) {
+    const info = businessSchema.shape.publicInfo.safeParse({
+      cnpj: values.cnpj?.trim().toUpperCase().replace(/[./-]/g, "") || undefined,
+      email: values.publicEmail?.trim() || undefined,
+    });
+    if (!info.success) fail(422, "Confira o CNPJ e o e-mail público do estabelecimento.");
+    fields.publicInfo = info.data;
+  }
   return fields;
 }
 

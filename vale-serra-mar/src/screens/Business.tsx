@@ -1,4 +1,5 @@
 import { CollectionState } from "../components/CollectionState";
+import { Alert } from "../components/Dialogs";
 import { Tap as Pressable } from "../components/Motion";
 import React, { useState } from "react";
 import { Image, Share, Text, View, useWindowDimensions } from "react-native";
@@ -108,6 +109,15 @@ export function BusinessScreen({ route }: ScreenProps) {
     restaurant = isRestaurant(b.segment),
     reservationsAvailable = canReserve(b),
     favorite = state.favorites.includes(b.id);
+  const { cnpj, email } = b.publicInfo ?? {};
+  const infoTitle = b.lodgingType === "Pousadas"
+    ? "Informações da pousada"
+    : "Informações do estabelecimento";
+  const checkTimes = hotel && !!b.checkIn && !!b.checkOut;
+  const showHours = !hotel || b.hours.some((hour) => hour.open);
+  const address = [b.address, b.number, b.district, b.city && `${b.city} - SP`, b.cep && `CEP ${b.cep}`]
+    .filter(Boolean)
+    .join(", ");
   const offers = b.status === "Aprovado"
     ? state.products.filter((product) => product.businessId === b.id && activeOffer(product))
     : [];
@@ -169,6 +179,21 @@ export function BusinessScreen({ route }: ScreenProps) {
         />
       </Pressable>
       <View style={s.between}>
+        {hotel && !!b.logo && (
+          <Image
+            source={photoSource(b.logo)}
+            accessibilityLabel={`Logotipo de ${b.name}`}
+            style={{
+              width: 68,
+              height: 68,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: c.border,
+              backgroundColor: c.white,
+            }}
+            resizeMode="contain"
+          />
+        )}
         <View style={s.grow}>
           <Text style={s.eyebrow}>{businessType(b).label}</Text>
           <Text style={s.title}>{b.name}</Text>
@@ -176,28 +201,43 @@ export function BusinessScreen({ route }: ScreenProps) {
             {b.address}, {b.number} · {b.city}
           </Text>
         </View>
-        <IconButton
-          icon="heart"
-          label={favorite ? "Remover favorito" : "Favoritar"}
-          onPress={() =>
-            update((s) => ({
-              ...s,
-              favorites: favorite
-                ? s.favorites.filter((x) => x !== b.id)
-                : [...s.favorites, b.id],
-            }))
-          }
-        />
+        <View style={{ gap: 6 }}>
+          {(cnpj || email) && (
+            <IconButton
+              icon="info"
+              label={infoTitle}
+              onPress={() => Alert.alert(
+                infoTitle,
+                [
+                  cnpj && `CNPJ\n${cnpj.replace(/^(.{2})(.{3})(.{3})(.{4})(.{2})$/, "$1.$2.$3/$4-$5")}`,
+                  email && `E-mail\n${email}`,
+                ].filter(Boolean).join("\n\n"),
+                [
+                  { text: "Fechar", style: "cancel" },
+                  ...(email ? [{
+                    text: "Enviar e-mail",
+                    onPress: () => openExternal(`mailto:${encodeURIComponent(email).replace("%40", "@")}`),
+                  }] : []),
+                ],
+              )}
+            />
+          )}
+          <IconButton
+            icon="heart"
+            label={favorite ? "Remover favorito" : "Favoritar"}
+            onPress={() =>
+              update((s) => ({
+                ...s,
+                favorites: favorite
+                  ? s.favorites.filter((x) => x !== b.id)
+                  : [...s.favorites, b.id],
+              }))
+            }
+          />
+        </View>
       </View>
-      <Badge
-        text={
-          hotel
-            ? `Check-in ${b.checkIn} · Check-out ${b.checkOut}`
-            : isOpen(b)
-              ? "Aberto agora"
-              : "Confira os horários"
-        }
-      />
+      {checkTimes && <Badge text={`Check-in ${b.checkIn} · Check-out ${b.checkOut}`} />}
+      {!hotel && <Badge text={isOpen(b) ? "Aberto agora" : "Confira os horários"} />}
       {restaurant && !reservationsAvailable && (
         <Notice tone="amber">
           Este estabelecimento não disponibiliza reservas de mesa pelo app.
@@ -277,13 +317,15 @@ export function BusinessScreen({ route }: ScreenProps) {
       )}
       <Section title="Sobre" />
       <Text style={s.body}>{b.description}</Text>
-      <Section title={hotel ? "Comodidades" : "Serviços"} />
-      <View style={s.wrap}>
-        {b.amenities.map((a) => (
-          <Badge key={a} text={a} />
-        ))}
-      </View>
-      {hotel && (
+      {b.amenities.length > 0 && (
+        <>
+          <Section title={hotel ? "Comodidades" : "Serviços"} />
+          <View style={s.wrap}>
+            {b.amenities.map((a) => <Badge key={a} text={a} />)}
+          </View>
+        </>
+      )}
+      {hotel && b.rooms.length > 0 && (
         <>
           <Section title="Acomodações" />
           {b.rooms.map((room) => (
@@ -313,22 +355,26 @@ export function BusinessScreen({ route }: ScreenProps) {
           ))}
         </>
       )}
-      <Section
-        title="Funcionamento"
-        action={allHours ? "Recolher" : "Ver todos"}
-        onPress={() => setAllHours(!allHours)}
-      />
-      {(allHours ? b.hours : b.hours.slice(0, 1)).map((h) => (
-        <View style={s.between} key={h.day}>
-          <Text style={s.body}>{h.day}</Text>
-          <Text style={s.muted}>
-            {h.open ? `${h.from} às ${h.to}` : "Fechado"}
-          </Text>
-        </View>
-      ))}
+      {showHours && (
+        <>
+          <Section
+            title="Funcionamento"
+            action={allHours ? "Recolher" : "Ver todos"}
+            onPress={() => setAllHours(!allHours)}
+          />
+          {(allHours ? b.hours : b.hours.slice(0, 1)).map((h) => (
+            <View style={s.between} key={h.day}>
+              <Text style={s.body}>{h.day}</Text>
+              <Text style={s.muted}>
+                {h.open ? `${h.from} às ${h.to}` : "Fechado"}
+              </Text>
+            </View>
+          ))}
+        </>
+      )}
       <Row
         title="Endereço e mapa"
-        subtitle={`${b.address}, ${b.number}, ${b.city}`}
+        subtitle={address}
         icon="map-pin"
         onPress={() => directions(b)}
       />
